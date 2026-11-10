@@ -1,0 +1,37 @@
+name: Build Muse (Academy Build)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out build source
+        uses: actions/checkout@v4
+
+      - name: Unit tests (history, window-state, skin + SDS-10 scans)
+        run: node test/run-tests.cjs
+
+      - name: Fetch the pinned Electron distribution
+        run: |
+          curl -sL -o electron.zip https://github.com/electron/electron/releases/download/v22.3.27/electron-v22.3.27-darwin-x64.zip
+          echo "01f053d08cb2855acb14f0465f4e36324a41bd13b3b2ead142970a56df3e9db1  electron.zip" | sha256sum -c -
+
+      - name: Assemble + self-verify the package
+        run: |
+          python3 tools/assemble.py \
+            --dist electron.zip --app app --assets assets \
+            --out Muse-Academy-1013-x64.zip
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create muse-academy-0.4.0 \
+            Muse-Academy-1013-x64.zip \
+            --title "Muse (Academy Build) 0.4.0-academy1" \
+            --notes "Window-management repair + Academy feature layer, built from the open-source muse-desktop v0.3.0 (MIT) on the pinned Electron 22.3.27 distribution. Windows never open partially off-screen; bounds restore validated against live displays; popups get computed on-screen placement; Dock activation restores the window. New: up-arrow sent-message history in the composer (per conversation, stored on this Mac only) and a monochrome Terminal Skin (View menu, Shift-Cmd-T). SDS-8 welcome with the library startup sound; SDS-10 conformance + Academy audit entries stamped in the bundle. Unsigned test build. Unofficial build: not a Meta product and not endorsed by Meta."

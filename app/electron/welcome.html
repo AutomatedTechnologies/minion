@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Welcome — Muse (Academy Build)</title>
+<style>
+  /* SDS-8 welcome — Muse (Academy Build). Monochrome ramp only,
+     flat tints, no blur, no remote assets: floor-honest on the
+     10.13 Air (Chromium 108, HD 4000). The mark is the Academy
+     radiating-arcs device drawn as inline SVG; the animation is
+     opacity/transform keyframes only. */
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #0a0a0a; color: #e6e6e6;
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-user-select: none; cursor: default;
+  }
+  .wrap {
+    height: 100%; box-sizing: border-box;
+    border-top: 1px solid #f2f2f2;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 36px 48px 28px;
+  }
+  /* SDS-10 clause 1: the welcome carries the app's one registered
+     logo — the same master as the bundle AppIcon (app-icon.png is
+     derived from icon.icns at assembly time, never a redraw). */
+  .mark { margin-top: 6px; animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.55; }
+    35% { opacity: 1; }
+    70% { opacity: 0.8; }
+  }
+  h1 {
+    font-size: 21px; font-weight: 600; letter-spacing: 0.4px;
+    margin: 22px 0 4px; color: #ffffff; text-align: center;
+  }
+  .sub {
+    font-size: 12.5px; color: #a8a8a8; text-align: center;
+    margin: 0 0 14px; line-height: 1.5;
+  }
+  .features {
+    font-size: 12.5px; color: #cfcfcf; line-height: 1.65;
+    margin: 0; padding: 0; list-style: none; text-align: center;
+  }
+  .features b { color: #ffffff; font-weight: 600; }
+  .spacer { flex: 1; }
+  button {
+    font-size: 13.5px; font-weight: 600;
+    background: #f2f2f2; color: #0a0a0a;
+    border: 1px solid #f2f2f2; border-radius: 999px;
+    padding: 8px 34px; cursor: pointer;
+  }
+  button:active { background: #cfcfcf; }
+  .fine {
+    margin-top: 14px; font-size: 11px; color: #767676; text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <img class="mark" src="app-icon.png" width="112" height="112" alt="">
+  <h1>Welcome to Muse (Academy Build)</h1>
+  <!-- SDS-10 clause 2: the version shown is read from this build's
+       own Info.plist at runtime (bridge below) — never hardcoded. -->
+  <p class="sub">The Muse client, rebuilt by the Detroit Automation Academy<br>
+  for macOS High Sierra<span id="build-line"></span></p>
+  <ul class="features">
+    <li><b>↑ History</b> — press ↑ in the message box to recall what you sent, shell-style</li>
+    <li><b>Terminal Skin</b> — View menu or ⇧⌘T: a monochrome terminal interface</li>
+    <li><b>Your data stays here</b> — history is stored only on this Mac</li>
+  </ul>
+  <div class="spacer"></div>
+  <button id="continue" type="button">Continue</button>
+  <p class="fine">Unofficial build: not a Meta product and not endorsed by Meta.<br>
+  muse-desktop is open source (MIT). Updates arrive through Distro only.</p>
+</div>
+<audio autoplay preload="auto" src="startup-sound.wav"></audio>
+<script>
+  // Version from the runtime bridge (main process reads it from the
+  // bundle's Info.plist). No bridge: the line simply stays unadorned.
+  try {
+    var info = window.academyWelcome && window.academyWelcome.getBuildInfo
+      ? window.academyWelcome.getBuildInfo()
+      : null;
+    if (info && info.version) {
+      document.getElementById('build-line').textContent = ' — version ' + info.version;
+    }
+  } catch (error) { /* the welcome must never fail on cosmetics */ }
+  document.getElementById('continue').addEventListener('click', function () {
+    if (window.academyWelcome && window.academyWelcome.done) {
+      window.academyWelcome.done();
+    } else {
+      window.close();
+    }
+  });
+</script>
+</body>
+</html>

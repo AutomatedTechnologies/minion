@@ -13,7 +13,7 @@ jobs:
       - name: Check out build source
         uses: actions/checkout@v4
 
-      - name: Unit tests (history, window-state, skin + SDS-10 scans)
+      - name: Unit tests (history, window-state, skin, markdown routing + SDS-10 scans)
         run: node test/run-tests.cjs
 
       - name: Fetch the pinned Electron distribution
@@ -31,7 +31,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create muse-academy-0.4.0-academy2 \
+          gh release create muse-academy-0.4.0-academy3 \
             Muse-Academy-1013-x64.zip \
-            --title "Muse (Academy Build) 0.4.0-academy2" \
-            --notes "Terminal Skin rebuilt under a whitelist discipline. The academy1 skin failed on the real hosted UI (owner screenshot 2026-11-10): its universal/structural selectors blacked out sidebar rows, covered panels with black blocks, boxed every button, and re-boxed the composer shell. The rebuilt sheet styles only three preload-tagged elements — the message stream (typography only), the composer (matched tint, caret, prompt glyph), and the composer shell (a painted left rule) — sets no layout property anywhere, and carries no root/body rules; toggling it off restores the stock UI in full without restart, and a persisted academy1 ON does not survive the upgrade (skin-preference epoch). Everything else from academy1 stands: window-management repair (windows never open partially off-screen; validated bounds restore; clamped popups; Dock activation restores), up-arrow sent-message history (per conversation, stored on this Mac only), SDS-8 welcome with the library startup sound, SDS-10 conformance + Academy audit entries in the bundle. Built from the open-source muse-desktop v0.3.0 (MIT) on the pinned Electron 22.3.27 distribution. Unsigned test build. Unofficial build: not a Meta product and not endorsed by Meta."
+            --title "Muse (Academy Build) 0.4.0-academy3" \
+            --notes "Markdown files open in MacDown by default (owner directive 2026-11-10; design in Distro files/24, tranche MD-T1). When a download completes in the app and it is markdown (.md/.markdown, binary payloads vetoed by MIME), the shell opens it in MacDown, the Academy's markdown editor — the file itself stays in Downloads, nothing is moved or deleted. The routing lives entirely in the main process: no preload or page-side change (preload.cjs and terminal-skin.css are byte-identical to academy2), and the router opens only destinations the shell itself downloaded this session. A View-menu preference (Markdown Files Open In: MacDown / Ask Each Time / System Default) controls it; files over 10 MiB ask first; if MacDown is not installed, a dialog offers Distro, the system default, or keeping the file in Downloads. Everything else stands from academy2: the whitelist terminal skin, window-management repair, up-arrow sent-message history (per conversation, stored on this Mac only), SDS-8 welcome with the library startup sound, SDS-10 conformance + Academy audit entries in the bundle. Built from the open-source muse-desktop v0.3.0 (MIT) on the pinned Electron 22.3.27 distribution. Unsigned test build. Unofficial build: not a Meta product and not endorsed by Meta."

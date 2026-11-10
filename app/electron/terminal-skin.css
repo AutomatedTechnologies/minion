@@ -1,163 +1,125 @@
 /*
- * terminal-skin.css — Muse (Academy Build) v0.4.0-academy.
+ * terminal-skin.css — Muse (Academy Build) v0.4.0-academy2.
  *
- * The terminal skin. SDS monochrome governs: this is the Academy
- * monochrome ramp (black / white / grays) in a terminal idiom —
- * monospace type, a prompt glyph on the composer shell, a bright
- * caret. There is deliberately NO green-on-black: terminal green is
- * not the Academy palette (files/18 spec addendum, 2026-11-10).
+ * The terminal skin, REBUILT under a whitelist discipline after the
+ * v0.4.0-academy1 sheet failed on the real hosted UI (owner
+ * screenshot, 2026-11-10 17:08 EST: sidebar rows blacked out and
+ * clipped, structural panels covered by black blocks, the profile
+ * panel's controls rendered as black rectangles, content
+ * overlapping — terminal skin FAIL recorded in Distro files/19).
+ * The academy1 sheet painted the page: universal and structural
+ * selectors forced backgrounds, button boxes, scrollbar widths and
+ * a re-boxed composer shell onto a DOM it had never run against.
+ * This sheet styles almost nothing, on purpose.
  *
- * Every rule is gated on html.academy-terminal, so the sheet is
- * inert when the skin is off. System font stack only (Menlo /
- * Monaco ship with macOS 10.13): no remote fonts, no images, no
- * blur — floor-honest on the Air (HD 4000, 4 GB).
+ * THE WHITELIST — the only things this sheet may touch, each scoped
+ * to a marker class the preload tags onto one specific element:
+ *   .academy-stream        the message stream container (found by
+ *                          the preload as the scrollable region of
+ *                          the conversation): typography only —
+ *                          font-family on the container (inherited)
+ *                          and on its text elements; controlled
+ *                          background/foreground tint inside code
+ *                          blocks only (a matched pair, so contrast
+ *                          is guaranteed by construction).
+ *   .academy-composer      the message input element itself:
+ *                          font-family, text color, caret-color, a
+ *                          matched background tint, and the prompt
+ *                          glyph as a background image (zero layout
+ *                          impact; it paints inside the composer's
+ *                          own box).
+ *   .academy-composer-shell the composer's form/parent, tagged by
+ *                          the preload: ONLY an inset box-shadow —
+ *                          the prompt's left rule, painted, with no
+ *                          border, padding, or position change, so
+ *                          the shell's box cannot move by a pixel.
+ *
+ * Everything else is banned here, and test/run-tests.cjs enforces
+ * the ban mechanically: no rule may set display, position, width,
+ * height, margin, padding, overflow, z-index, float, or any border
+ * property; no selector may target a generic element or container
+ * (every selector is gated on html.academy-terminal AND scoped to
+ * a marker class above); the root elements (html/body) carry no
+ * rules at all — the v0.4.0 takeover of the page's own backgrounds
+ * is the defect being removed, not restyled.
+ *
+ * Palette: SDS monochrome ramp only — no green-on-black (files/18
+ * section 9.2). Where this sheet sets a foreground it also sets
+ * the background it sits on (composer, code blocks), so the skin
+ * can never produce the academy1 failure of light text stranded on
+ * the page's light surfaces or dark boxes swallowing icons: it
+ * never touches buttons, navigation, sidebars, or images at all.
+ * System font stack only (Menlo / Monaco ship with macOS 10.13):
+ * no remote fonts, no images fetched (the prompt glyph is an
+ * inline SVG data URI), no blur — floor-honest on the Air.
+ *
+ * Kill-switch: every selector requires html.academy-terminal, so
+ * removing the class (the View-menu toggle) restores the stock UI
+ * in full, in place, with no restart and no residue.
  */
 
-html.academy-terminal,
-html.academy-terminal body {
-  background-color: #0a0a0a !important;
-  color: #e6e6e6 !important;
+html.academy-terminal .academy-stream {
+  font-family: Menlo, Monaco, "Courier New", monospace;
+}
+
+html.academy-terminal .academy-stream p,
+html.academy-terminal .academy-stream li,
+html.academy-terminal .academy-stream blockquote,
+html.academy-terminal .academy-stream h1,
+html.academy-terminal .academy-stream h2,
+html.academy-terminal .academy-stream h3,
+html.academy-terminal .academy-stream h4,
+html.academy-terminal .academy-stream h5,
+html.academy-terminal .academy-stream h6,
+html.academy-terminal .academy-stream td,
+html.academy-terminal .academy-stream th {
   font-family: Menlo, Monaco, "Courier New", monospace !important;
-}
-
-html.academy-terminal body,
-html.academy-terminal body * {
-  font-family: Menlo, Monaco, "Courier New", monospace !important;
-}
-
-html.academy-terminal main,
-html.academy-terminal section,
-html.academy-terminal article,
-html.academy-terminal aside,
-html.academy-terminal header,
-html.academy-terminal footer,
-html.academy-terminal nav {
-  background-color: #0a0a0a !important;
-  color: #e6e6e6 !important;
-  border-color: #2e2e2e !important;
-  box-shadow: none !important;
-}
-
-html.academy-terminal div,
-html.academy-terminal span,
-html.academy-terminal p,
-html.academy-terminal li,
-html.academy-terminal td,
-html.academy-terminal th {
-  border-color: #2e2e2e !important;
-}
-
-html.academy-terminal h1,
-html.academy-terminal h2,
-html.academy-terminal h3,
-html.academy-terminal h4,
-html.academy-terminal h5,
-html.academy-terminal h6 {
-  color: #ffffff !important;
-  letter-spacing: 0 !important;
-}
-
-html.academy-terminal a {
-  color: #d6d6d6 !important;
-  text-decoration: underline !important;
-}
-
-html.academy-terminal button,
-html.academy-terminal [role="button"],
-html.academy-terminal input[type="button"],
-html.academy-terminal input[type="submit"] {
-  background-color: #161616 !important;
-  color: #e6e6e6 !important;
-  border: 1px solid #3a3a3a !important;
-  border-radius: 2px !important;
-  box-shadow: none !important;
-}
-
-html.academy-terminal button:hover,
-html.academy-terminal [role="button"]:hover {
-  background-color: #232323 !important;
-  border-color: #e6e6e6 !important;
-}
-
-html.academy-terminal textarea,
-html.academy-terminal input[type="text"],
-html.academy-terminal input[type="search"],
-html.academy-terminal [contenteditable="true"],
-html.academy-terminal [contenteditable=""],
-html.academy-terminal [role="textbox"] {
-  background-color: #000000 !important;
-  color: #f2f2f2 !important;
-  caret-color: #ffffff !important;
-  border-color: #3a3a3a !important;
-  box-shadow: none !important;
-}
-
-html.academy-terminal textarea:focus,
-html.academy-terminal [contenteditable="true"]:focus,
-html.academy-terminal [contenteditable=""]:focus,
-html.academy-terminal [role="textbox"]:focus {
-  outline: 1px solid #e6e6e6 !important;
-  outline-offset: 0 !important;
-}
-
-html.academy-terminal pre,
-html.academy-terminal code,
-html.academy-terminal kbd {
-  background-color: #141414 !important;
-  color: #f2f2f2 !important;
-  border-color: #2e2e2e !important;
-}
-
-html.academy-terminal hr {
-  border-color: #2e2e2e !important;
-}
-
-html.academy-terminal ::selection {
-  background-color: #e6e6e6 !important;
-  color: #000000 !important;
-}
-
-html.academy-terminal ::-webkit-scrollbar {
-  width: 10px !important;
-  height: 10px !important;
-}
-html.academy-terminal ::-webkit-scrollbar-track {
-  background-color: #0a0a0a !important;
-}
-html.academy-terminal ::-webkit-scrollbar-thumb {
-  background-color: #3a3a3a !important;
-  border: 2px solid #0a0a0a !important;
-  border-radius: 5px !important;
 }
 
 /*
- * The prompt: the composer shell carries a terminal prompt glyph
- * and a hard left rule, so the input reads as a prompt line. The
- * text cursor itself is the native caret, recolored bright white
- * above — a real, visible cursor, not a drawn overlay.
+ * Code blocks inside the stream: the one place the skin tints a
+ * surface. Background and foreground are set together (a matched
+ * pair), and token spans inside inherit the pair — syntax colors
+ * flatten to the terminal idiom instead of stranding dark tokens
+ * on the dark tint.
+ */
+html.academy-terminal .academy-stream pre,
+html.academy-terminal .academy-stream code {
+  font-family: Menlo, Monaco, "Courier New", monospace !important;
+  background-color: #141414 !important;
+  color: #f2f2f2 !important;
+}
+
+html.academy-terminal .academy-stream pre *,
+html.academy-terminal .academy-stream code * {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+/*
+ * The composer: the skin's centerpiece, and a leaf element the
+ * preload identifies positively — so a full matched treatment is
+ * safe here and only here: black box, bright text, white native
+ * caret (the real editing cursor, recolored — not an overlay),
+ * monospace, and the prompt glyph painted as a background chevron
+ * inside the composer's own padding zone.
+ */
+html.academy-terminal .academy-composer {
+  font-family: Menlo, Monaco, "Courier New", monospace !important;
+  background-color: #000000 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='14' viewBox='0 0 9 14'%3E%3Cpath d='M1.5 1.5 7.5 7 1.5 12.5' fill='none' stroke='%23ffffff' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 10px 12px;
+  color: #f2f2f2 !important;
+  caret-color: #ffffff;
+}
+
+/*
+ * The prompt's left rule on the composer shell: an inset shadow —
+ * paint only. No border (a border can widen a content-box), no
+ * padding, no position: the shell's geometry is bit-identical with
+ * the skin on or off.
  */
 html.academy-terminal .academy-composer-shell {
-  position: relative !important;
-  background-color: #000000 !important;
-  border: 1px solid #3a3a3a !important;
-  border-left: 3px solid #e6e6e6 !important;
-  border-radius: 2px !important;
-  padding-left: 22px !important;
-}
-
-html.academy-terminal .academy-composer-shell::before {
-  content: ">" !important;
-  position: absolute !important;
-  left: 7px !important;
-  top: 8px !important;
-  color: #ffffff !important;
-  font-family: Menlo, Monaco, "Courier New", monospace !important;
-  font-weight: bold !important;
-  pointer-events: none !important;
-}
-
-html.academy-terminal img,
-html.academy-terminal video,
-html.academy-terminal svg {
-  border-color: #2e2e2e !important;
+  box-shadow: inset 3px 0 0 #8a8a8a;
 }

@@ -18,6 +18,12 @@
  *    upgrade can never re-apply a superseded skin unasked, and a
  *    fresh install defaults OFF. Only an explicit toggle in a
  *    build of the current epoch persists ON.
+ *  - Markdown routing (0.4.0-academy3, Distro files/24): the
+ *    owner's preference for where a downloaded markdown file
+ *    opens — MacDown (default), Ask Each Time, or the system
+ *    default — persisted here as markdownRoute and read by the
+ *    main-process router (md-route.cjs) at each download
+ *    completion. State only; the routing itself is the shell's.
  *  - SDS-8 welcome: a local welcome window (welcome.html + the
  *    library startup sound) shown once, on first launch; replayable
  *    from the app menu. Never blocks the service window beyond the
@@ -62,6 +68,11 @@ function install(ctx) {
   const store = createHistoryStore();
   let terminalSkin = false;
   let welcomeSeen = false;
+  // Markdown routing preference (files/24 section 5a): where a
+  // downloaded .md/.markdown opens. 'macdown' is the default —
+  // the owner's directive is the consent for Muse-internal
+  // behavior. Finder and every other app are untouched by it.
+  let markdownRoute = 'macdown';
   // Window-management repair: the main window's normal bounds +
   // maximized flag, persisted so the app reopens where the owner
   // left it — validated against the current displays on restore
@@ -80,6 +91,9 @@ function install(ctx) {
         // explicitly if he wants the rebuilt one.
         terminalSkin = data.skinEpoch >= SKIN_EPOCH && data.terminalSkin === true;
         welcomeSeen = data.welcomeSeen === true;
+        if (['macdown', 'ask', 'system'].includes(data.markdownRoute)) {
+          markdownRoute = data.markdownRoute;
+        }
         if (data.window && typeof data.window === 'object') {
           windowState = {
             bounds: data.window.bounds || null,
@@ -101,6 +115,7 @@ function install(ctx) {
         terminalSkin: terminalSkin,
         skinEpoch: SKIN_EPOCH,
         welcomeSeen: welcomeSeen,
+        markdownRoute: markdownRoute,
         window: windowState,
       }), { mode: 0o600 });
       fs.renameSync(tmp, statePath);
@@ -166,6 +181,12 @@ function install(ctx) {
     if (skinMenuItem) skinMenuItem.checked = terminalSkin;
     saveState();
     broadcastSkin();
+  }
+
+  function setMarkdownRoute(route) {
+    if (!['macdown', 'ask', 'system'].includes(route)) return;
+    markdownRoute = route;
+    saveState();
   }
 
   // SDS-10 clause 2: the welcome page asks for the build's version;
@@ -294,6 +315,29 @@ function install(ctx) {
             click: (item) => setTerminalSkin(item.checked),
           },
           {
+            label: 'Markdown Files Open In',
+            submenu: [
+              {
+                label: 'MacDown',
+                type: 'radio',
+                checked: markdownRoute === 'macdown',
+                click: () => setMarkdownRoute('macdown'),
+              },
+              {
+                label: 'Ask Each Time',
+                type: 'radio',
+                checked: markdownRoute === 'ask',
+                click: () => setMarkdownRoute('ask'),
+              },
+              {
+                label: 'System Default',
+                type: 'radio',
+                checked: markdownRoute === 'system',
+                click: () => setMarkdownRoute('system'),
+              },
+            ],
+          },
+          {
             label: 'Clear Saved Message History…',
             click: async () => {
               const win = BrowserWindow.getFocusedWindow() || undefined;
@@ -361,7 +405,7 @@ function install(ctx) {
 
   app.setAboutPanelOptions({
     applicationName: 'Muse (Academy Build)',
-    applicationVersion: ctx.buildLabel || '0.4.0-academy2',
+    applicationVersion: ctx.buildLabel || '0.4.0-academy3',
     version: '0.4.0',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +
@@ -374,6 +418,8 @@ function install(ctx) {
     showWelcome: () => showWelcome(),
     setTerminalSkin: setTerminalSkin,
     isTerminalSkin: () => terminalSkin,
+    getMarkdownRoute: () => markdownRoute,
+    setMarkdownRoute: setMarkdownRoute,
     getWindowState: () => windowState,
     setWindowState: (bounds, isMaximized) => {
       windowState = { bounds: bounds || null, isMaximized: !!isMaximized };

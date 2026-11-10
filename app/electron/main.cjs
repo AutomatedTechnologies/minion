@@ -1,6 +1,8 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
+const os = require("node:os");
+const { execFile, execFileSync } = require("node:child_process");
 
 const MUSE_URL = "https://muse.ai/";
 const {
@@ -23,18 +25,71 @@ const {
 // pane stack from the T1 design is NOT applied to popups; they get
 // computed, clamped initial bounds instead.
 const academy = require("./academy.cjs");
+const {
+  createMarkdownRouter,
+  DISTRO_BUNDLE_ID,
+} = require("./md-route.cjs");
 const { clampRectToVisibleFrame } = require("./window-law.cjs");
 const {
   validateRestoreBounds,
   placementFor,
 } = require("./window-state.cjs");
 
-const ACADEMY_BUILD_LABEL = "0.4.0-academy2";
+const ACADEMY_BUILD_LABEL = "0.4.0-academy3";
 const ACADEMY_PRELOAD = path.join(__dirname, "preload.cjs");
 
 // Set by start() once the feature layer is installed; window
 // creation reads saved bounds through it.
 let academyLayer = null;
+
+// Markdown routing (Distro files/24): set by start() once the
+// feature layer exists (the router reads the owner's preference
+// through it). configureSession's download handler consults it at
+// completion time; downloads are the shell-owned encounter.
+let markdownRouter = null;
+
+function openWithBundleId(bundleId, filePath) {
+  return new Promise((resolve) => {
+    const args = filePath ? ["-b", bundleId, filePath] : ["-b", bundleId];
+    execFile("/usr/bin/open", args, (error) => resolve(!error));
+  });
+}
+
+function readBundleId(appPath) {
+  try {
+    return execFileSync(
+      "/usr/libexec/PlistBuddy",
+      ["-c", "Print :CFBundleIdentifier", path.join(appPath, "Contents", "Info.plist")],
+      { encoding: "utf8", timeout: 5000 },
+    ).trim();
+  } catch {
+    return null;
+  }
+}
+
+function installMarkdownRouter() {
+  markdownRouter = createMarkdownRouter({
+    statSync: (p) => fs.statSync(p),
+    realpathSync: (p) => fs.realpathSync(p),
+    readBundleId,
+    homeDir: os.homedir(),
+    openWithBundle: (bundleId, filePath) => openWithBundleId(bundleId, filePath),
+    openSystemDefault: async (filePath) => {
+      const error = await shell.openPath(filePath);
+      return error === "";
+    },
+    openDistro: () => openWithBundleId(DISTRO_BUNDLE_ID),
+    showMessageBox: (options) => {
+      const win = BrowserWindow.getFocusedWindow();
+      return win
+        ? dialog.showMessageBox(win, options)
+        : dialog.showMessageBox(options);
+    },
+    getPreference: () =>
+      academyLayer ? academyLayer.getMarkdownRoute() : "macdown",
+    log: (message) => console.warn(message),
+  });
+}
 
 function clampRectToWorkArea(wanted) {
   const display = screen.getDisplayMatching(wanted);
@@ -154,14 +209,34 @@ function configureSession(ses) {
       }
     };
     try {
+      const filename = item.getFilename();
+      const mimeType = item.getMimeType();
       destination = uniqueDownloadPath(
         app.getPath("downloads"),
-        item.getFilename(),
+        filename,
       );
       item.once("done", (_event, state) => {
-        if (state !== "completed") cleanup();
+        if (state !== "completed") {
+          cleanup();
+          return;
+        }
+        // Markdown routing (files/24): a completed download the
+        // classifier calls markdown opens in MacDown per the
+        // owner's preference. The router's allowlist holds only
+        // destinations this handler reserved (noted below).
+        if (markdownRouter) {
+          void markdownRouter
+            .handleCompletedDownload({
+              destination,
+              savePath: item.getSavePath(),
+              filename,
+              mimeType,
+            })
+            .catch(() => console.warn("MarkdownRoute: routing failed"));
+        }
       });
       item.setSavePath(destination);
+      if (markdownRouter) markdownRouter.noteDownload(destination);
     } catch {
       cleanup();
       item.cancel();
@@ -348,6 +423,7 @@ function start() {
       ipcMain,
       buildLabel: ACADEMY_BUILD_LABEL,
     });
+    installMarkdownRouter();
     academyLayer.gateWelcome(createMuseWindow);
     app.on("activate", () => {
       const windows = BrowserWindow.getAllWindows();

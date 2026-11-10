@@ -20,10 +20,16 @@
  *     process in the app's own data directory.
  *  2. Terminal skin support: applies the `academy-terminal` class on
  *     <html> per the persisted preference and injects the skin
- *     stylesheet text served by the main process (the rules are
- *     gated on the class, so the sheet is inert when the skin is
- *     off). Also marks the composer shell so the skin can draw its
- *     prompt glyph. Enter sends / Shift+Enter newline is the
+ *     stylesheet text served by the main process. The academy2
+ *     sheet is whitelist-built (see terminal-skin.css): it can only
+ *     style elements carrying a marker class, so this preload tags
+ *     exactly three — the composer element (academy-composer), its
+ *     shell (academy-composer-shell), and the message stream
+ *     container (academy-stream, the scrollable region holding the
+ *     conversation). Every skin rule also requires the html class,
+ *     so toggling the class off restores the stock UI in full, in
+ *     place, with no restart and no residue — the kill-switch is
+ *     the class itself. Enter sends / Shift+Enter newline is the
  *     composer's own behavior and is not overridden.
  */
 
@@ -237,12 +243,60 @@ function init() {
     }).catch(function () { /* best-effort */ });
   }
 
+  var streamEl = null;
+
+  // The message stream is the scrollable region holding the
+  // conversation. The composer may sit inside it or below it as a
+  // sibling, so look in two places: the composer's own scrollable
+  // ancestor chain, then the tallest scrollable element in the
+  // main landmark. Found or not, this only ever tags ONE element
+  // with a marker class — the skin styles nothing else.
+  function findStream() {
+    try {
+      var el = composer;
+      while (el && el.parentElement && el.parentElement !== document.body) {
+        el = el.parentElement;
+        var style = window.getComputedStyle(el);
+        if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && el.clientHeight >= 120) {
+          return el;
+        }
+      }
+    } catch (error) { /* fall through to the landmark search */ }
+    try {
+      var root = document.querySelector('main') || document.body;
+      var nodes = root.querySelectorAll('div, section');
+      var best = null;
+      var bestHeight = 119;
+      for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i];
+        var st = window.getComputedStyle(node);
+        if ((st.overflowY === 'auto' || st.overflowY === 'scroll') && node.clientHeight > bestHeight) {
+          best = node;
+          bestHeight = node.clientHeight;
+        }
+      }
+      return best;
+    } catch (error) {
+      return null;
+    }
+  }
+
   function trackComposer() {
     var found = findComposer();
     if (found && found !== composer) {
+      if (composer && composer.classList) composer.classList.remove('academy-composer');
       composer = found;
+      if (composer.classList) composer.classList.add('academy-composer');
       var shell = composer.closest ? (composer.closest('form') || composer.parentElement) : null;
       if (shell && shell.classList) shell.classList.add('academy-composer-shell');
+    }
+    if (composer) {
+      var stream = findStream();
+      if (stream !== streamEl) {
+        if (streamEl && streamEl.classList) streamEl.classList.remove('academy-stream');
+        streamEl = stream;
+        if (streamEl && streamEl.classList) streamEl.classList.add('academy-stream');
+      }
     }
     return composer;
   }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble Muse-Academy-1013-x64.zip — Muse (Academy Build) 0.4.0-academy2.
+"""Assemble Muse-Academy-1013-x64.zip — Muse (Academy Build) 0.4.0-academy3.
 
 Construction of record (Distro files/06): the official Electron
 v22.3.27 darwin-x64 distribution (SHA-256 pinned below — a mismatch
@@ -67,6 +67,8 @@ EXPECTED_APP_FILES = [
     "electron/main.cjs",
     "electron/utils.cjs",
     "electron/academy.cjs",
+    "electron/md-classify.cjs",
+    "electron/md-route.cjs",
     "electron/history.cjs",
     "electron/window-law.cjs",
     "electron/window-state.cjs",

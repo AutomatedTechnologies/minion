@@ -1,0 +1,163 @@
+/*
+ * terminal-skin.css — Muse (Academy Build) v0.4.0-academy.
+ *
+ * The terminal skin. SDS monochrome governs: this is the Academy
+ * monochrome ramp (black / white / grays) in a terminal idiom —
+ * monospace type, a prompt glyph on the composer shell, a bright
+ * caret. There is deliberately NO green-on-black: terminal green is
+ * not the Academy palette (files/18 spec addendum, 2026-11-10).
+ *
+ * Every rule is gated on html.academy-terminal, so the sheet is
+ * inert when the skin is off. System font stack only (Menlo /
+ * Monaco ship with macOS 10.13): no remote fonts, no images, no
+ * blur — floor-honest on the Air (HD 4000, 4 GB).
+ */
+
+html.academy-terminal,
+html.academy-terminal body {
+  background-color: #0a0a0a !important;
+  color: #e6e6e6 !important;
+  font-family: Menlo, Monaco, "Courier New", monospace !important;
+}
+
+html.academy-terminal body,
+html.academy-terminal body * {
+  font-family: Menlo, Monaco, "Courier New", monospace !important;
+}
+
+html.academy-terminal main,
+html.academy-terminal section,
+html.academy-terminal article,
+html.academy-terminal aside,
+html.academy-terminal header,
+html.academy-terminal footer,
+html.academy-terminal nav {
+  background-color: #0a0a0a !important;
+  color: #e6e6e6 !important;
+  border-color: #2e2e2e !important;
+  box-shadow: none !important;
+}
+
+html.academy-terminal div,
+html.academy-terminal span,
+html.academy-terminal p,
+html.academy-terminal li,
+html.academy-terminal td,
+html.academy-terminal th {
+  border-color: #2e2e2e !important;
+}
+
+html.academy-terminal h1,
+html.academy-terminal h2,
+html.academy-terminal h3,
+html.academy-terminal h4,
+html.academy-terminal h5,
+html.academy-terminal h6 {
+  color: #ffffff !important;
+  letter-spacing: 0 !important;
+}
+
+html.academy-terminal a {
+  color: #d6d6d6 !important;
+  text-decoration: underline !important;
+}
+
+html.academy-terminal button,
+html.academy-terminal [role="button"],
+html.academy-terminal input[type="button"],
+html.academy-terminal input[type="submit"] {
+  background-color: #161616 !important;
+  color: #e6e6e6 !important;
+  border: 1px solid #3a3a3a !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+html.academy-terminal button:hover,
+html.academy-terminal [role="button"]:hover {
+  background-color: #232323 !important;
+  border-color: #e6e6e6 !important;
+}
+
+html.academy-terminal textarea,
+html.academy-terminal input[type="text"],
+html.academy-terminal input[type="search"],
+html.academy-terminal [contenteditable="true"],
+html.academy-terminal [contenteditable=""],
+html.academy-terminal [role="textbox"] {
+  background-color: #000000 !important;
+  color: #f2f2f2 !important;
+  caret-color: #ffffff !important;
+  border-color: #3a3a3a !important;
+  box-shadow: none !important;
+}
+
+html.academy-terminal textarea:focus,
+html.academy-terminal [contenteditable="true"]:focus,
+html.academy-terminal [contenteditable=""]:focus,
+html.academy-terminal [role="textbox"]:focus {
+  outline: 1px solid #e6e6e6 !important;
+  outline-offset: 0 !important;
+}
+
+html.academy-terminal pre,
+html.academy-terminal code,
+html.academy-terminal kbd {
+  background-color: #141414 !important;
+  color: #f2f2f2 !important;
+  border-color: #2e2e2e !important;
+}
+
+html.academy-terminal hr {
+  border-color: #2e2e2e !important;
+}
+
+html.academy-terminal ::selection {
+  background-color: #e6e6e6 !important;
+  color: #000000 !important;
+}
+
+html.academy-terminal ::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+}
+html.academy-terminal ::-webkit-scrollbar-track {
+  background-color: #0a0a0a !important;
+}
+html.academy-terminal ::-webkit-scrollbar-thumb {
+  background-color: #3a3a3a !important;
+  border: 2px solid #0a0a0a !important;
+  border-radius: 5px !important;
+}
+
+/*
+ * The prompt: the composer shell carries a terminal prompt glyph
+ * and a hard left rule, so the input reads as a prompt line. The
+ * text cursor itself is the native caret, recolored bright white
+ * above — a real, visible cursor, not a drawn overlay.
+ */
+html.academy-terminal .academy-composer-shell {
+  position: relative !important;
+  background-color: #000000 !important;
+  border: 1px solid #3a3a3a !important;
+  border-left: 3px solid #e6e6e6 !important;
+  border-radius: 2px !important;
+  padding-left: 22px !important;
+}
+
+html.academy-terminal .academy-composer-shell::before {
+  content: ">" !important;
+  position: absolute !important;
+  left: 7px !important;
+  top: 8px !important;
+  color: #ffffff !important;
+  font-family: Menlo, Monaco, "Courier New", monospace !important;
+  font-weight: bold !important;
+  pointer-events: none !important;
+}
+
+html.academy-terminal img,
+html.academy-terminal video,
+html.academy-terminal svg {
+  border-color: #2e2e2e !important;
+}

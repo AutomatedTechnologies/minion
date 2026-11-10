@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Muse (Academy Build) v0.4.0-academy1 verification.
+ * run-tests.cjs — Muse (Academy Build) v0.4.0-academy2 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -226,11 +226,76 @@ function assertGrayscale(file) {
 ok('terminal-skin.css: monochrome ramp only; no remote/gradient/blur', () => {
   assertGrayscale(path.join(ELE, 'terminal-skin.css'));
   const css = fs.readFileSync(path.join(ELE, 'terminal-skin.css'), 'utf8');
-  assert.ok(!/https?:\/\//.test(css), 'no remote refs');
-  assert.ok(!/url\(/.test(css), 'no url() fetches');
+  // academy2 amendment: the ONLY url() permitted is the inline SVG
+  // data URI carrying the composer's prompt glyph — it fetches
+  // nothing. Any other url() (remote or local file) fails. The
+  // remote-ref scan runs with data URIs removed: the SVG xmlns
+  // inside the payload is a namespace identifier, not a reference.
+  const urls = css.match(/url\([^)]*\)/g) || [];
+  assert.ok(!/https?:\/\//.test(css.replace(/url\([^)]*\)/g, '')), 'no remote refs');
+  for (const u of urls) {
+    assert.ok(u.startsWith('url("data:image/svg+xml,'), 'url() must be the inline SVG glyph, got: ' + u.slice(0, 60));
+  }
   assert.ok(!/gradient/.test(css), 'no gradients');
   assert.ok(!/backdrop-filter/.test(css), 'no backdrop blur');
   assert.ok(/html\.academy-terminal/.test(css), 'rules are class-gated');
+});
+
+ok('terminal-skin.css: whitelist discipline (academy2 rebuild)', () => {
+  const raw = fs.readFileSync(path.join(ELE, 'terminal-skin.css'), 'utf8');
+  // Strip comments before scanning: the header documents the ban
+  // in prose and must not trip its own enforcement.
+  const css = raw.replace(/\/\*[\s\S]*?\*\//g, '');
+  // Parse rules: selector list + declaration block.
+  const rules = [];
+  const re = /([^{}]+)\{([^{}]*)\}/g;
+  let m;
+  while ((m = re.exec(css)) !== null) rules.push({ sel: m[1].trim(), body: m[2] });
+  assert.ok(rules.length >= 4, 'skin rules present');
+  const MARKERS = ['.academy-stream', '.academy-composer', '.academy-composer-shell'];
+  for (const rule of rules) {
+    const selectors = rule.sel.split(',').map((s) => s.trim()).filter(Boolean);
+    assert.ok(selectors.length > 0, 'rule has selectors');
+    for (const sel of selectors) {
+      // Gate: every selector requires the html class (kill-switch
+      // soundness — removing the class restores the stock UI).
+      assert.ok(sel.startsWith('html.academy-terminal'), 'selector not class-gated: ' + sel);
+      // Scope: after the gate, the next compound is a marker class,
+      // never a generic element, the universal selector, or body.
+      assert.ok(MARKERS.some((k) => sel.startsWith('html.academy-terminal ' + k)),
+        'selector not scoped to a whitelist marker: ' + sel);
+    }
+    // Declarations: typography, color, caret, matched tints, the
+    // painted left rule — and nothing that can move a box.
+    const banned = /(^|;)\s*(display|position|width|height|min-width|max-width|min-height|max-height|margin|padding|overflow|z-index|float|top|left|right|bottom|border|visibility|transform|opacity)\s*:/;
+    assert.ok(!banned.test(';' + rule.body), 'banned layout property in rule: ' + rule.sel);
+  }
+  // The painted left rule is the sheet's only box-shadow.
+  assert.strictEqual((css.match(/box-shadow/g) || []).length, 1, 'exactly one box-shadow (the shell rule)');
+  // The root elements carry no rules (the academy1 takeover ban).
+  assert.ok(!/html\.academy-terminal\s*,/.test(css), 'no bare html gate rule');
+  assert.ok(!/html\.academy-terminal\s+body/.test(css), 'no body rules');
+});
+
+ok('skin preference epoch: an academy1 ON cannot survive the upgrade', () => {
+  const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
+  assert.ok(/const SKIN_EPOCH = 2;/.test(academy), 'epoch constant at 2');
+  assert.ok(/data\.skinEpoch >= SKIN_EPOCH && data\.terminalSkin === true/.test(academy),
+    'load honors the persisted preference only at the current epoch');
+  assert.ok(/skinEpoch: SKIN_EPOCH/.test(academy), 'save stamps the current epoch');
+  // The toggle path itself is unchanged and total: class on/off via
+  // the broadcast, state saved — verified in preload below.
+  const preload = fs.readFileSync(path.join(ELE, 'preload.cjs'), 'utf8');
+  assert.ok(/classList\.toggle\('academy-terminal', !!on\)/.test(preload),
+    'kill-switch toggles the single gating class');
+});
+
+ok('preload tags exactly the whitelist marker elements', () => {
+  const preload = fs.readFileSync(path.join(ELE, 'preload.cjs'), 'utf8');
+  assert.ok(/classList\.add\('academy-composer'\)/.test(preload), 'composer element tagged');
+  assert.ok(/classList\.add\('academy-composer-shell'\)/.test(preload), 'composer shell tagged');
+  assert.ok(/classList\.add\('academy-stream'\)/.test(preload), 'message stream tagged');
+  assert.ok(/classList\.remove\('academy-stream'\)/.test(preload), 'stale stream tag moved, not duplicated');
 });
 
 ok('welcome.html: monochrome, self-contained, carries the unofficial line', () => {

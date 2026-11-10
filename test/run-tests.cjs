@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Muse (Academy Build) v0.4.0-academy2 verification.
+ * run-tests.cjs — Muse (Academy Build) v0.4.0-academy3 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -28,10 +28,10 @@ function ok(name, fn) {
 }
 
 // 0. Syntax: every shipped script parses.
-for (const f of ['main.cjs', 'utils.cjs', 'academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'window-law.cjs', 'window-state.cjs']) {
+for (const f of ['main.cjs', 'utils.cjs', 'academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'window-law.cjs', 'window-state.cjs', 'md-classify.cjs', 'md-route.cjs']) {
   execFileSync(process.execPath, ['--check', path.join(ELE, f)]);
 }
-ok('node --check clean on all 8 app-layer scripts', () => {});
+ok('node --check clean on all 10 app-layer scripts', () => {});
 
 const ws = require(path.join(ELE, 'window-state.cjs'));
 const AIR = { x: 0, y: 23, width: 1440, height: 877 }; // 13" Air work area
@@ -323,7 +323,7 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
     /\.at\(-/, /structuredClone/, /replaceAll\(/, /findLast\(/,
     /Object\.hasOwn/, /top-level await/, /\busing\s+\w+\s*=/,
   ];
-  for (const f of ['academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs']) {
+  for (const f of ['academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'md-classify.cjs', 'md-route.cjs']) {
     const text = fs.readFileSync(path.join(ELE, f), 'utf8');
     for (const pattern of banned) {
       assert.ok(!pattern.test(text), f + ' uses banned ' + pattern);
@@ -346,4 +346,247 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
   assert.strictEqual(pkg.build.appId, 'ai.muse.desktop');
 });
 
-console.log('\nALL ' + passed + ' TEST GROUPS PASSED');
+// ---- Markdown routing (0.4.0-academy3, Distro files/24 MD-T1) ----
+
+const mdClassify = require(path.join(ELE, 'md-classify.cjs'));
+const mdRoute = require(path.join(ELE, 'md-route.cjs'));
+
+ok('md-classify: extension is primary; .md/.markdown in, .mdown/.txt out', () => {
+  assert.strictEqual(mdClassify.classifyDownload('piece.md', 'text/plain'), true);
+  assert.strictEqual(mdClassify.classifyDownload('piece.MD', ''), true);
+  assert.strictEqual(mdClassify.classifyDownload('notes.markdown', 'application/octet-stream'), true);
+  assert.strictEqual(mdClassify.classifyDownload('notes.mdown', 'text/plain'), false);
+  assert.strictEqual(mdClassify.classifyDownload('notes.txt', 'text/plain'), false);
+  assert.strictEqual(mdClassify.classifyDownload('archive.md.txt', 'text/plain'), false);
+  assert.strictEqual(mdClassify.classifyDownload('noext', 'text/markdown'), false);
+  assert.strictEqual(mdClassify.classifyDownload('', ''), false);
+});
+
+ok('md-classify: binary MIME vetoes a markdown name; text MIMEs never veto', () => {
+  for (const mime of ['application/zip', 'application/pdf', 'image/png', 'audio/mpeg', 'video/mp4', 'application/x-tar', 'application/x-7z-compressed']) {
+    assert.strictEqual(mdClassify.classifyDownload('evil.md', mime), false, mime + ' must veto');
+  }
+  assert.strictEqual(mdClassify.classifyDownload('evil.md', 'application/zip; charset=binary'), false);
+  for (const mime of ['text/plain', 'text/markdown', 'text/x-markdown; charset=utf-8', 'application/octet-stream', '']) {
+    assert.strictEqual(mdClassify.classifyDownload('real.md', mime), true, mime + ' must not veto');
+  }
+});
+
+ok('md-route: modules are pure main-process code (no Electron, no IPC surface)', () => {
+  for (const f of ['md-classify.cjs', 'md-route.cjs']) {
+    const text = fs.readFileSync(path.join(ELE, f), 'utf8');
+    assert.ok(!/require\(['"]electron['"]\)/.test(text), f + ' must not require electron');
+    assert.ok(!/ipcMain\.(handle|on)\(/.test(text), f + ' must not register IPC');
+  }
+  const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
+  assert.ok(/handleCompletedDownload\(/.test(main), 'main routes completed downloads');
+  assert.ok(/noteDownload\(destination\)/.test(main), 'main notes reserved destinations (allowlist)');
+  assert.ok(/getMimeType\(\)/.test(main), 'main captures the download MIME for the classifier');
+  const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
+  assert.ok(/getMarkdownRoute/.test(academy), 'academy state serves the routing preference');
+});
+
+ok('academy state: markdownRoute round-trips; invalid values fall back to macdown', () => {
+  const os = require('node:os');
+  const academy = require(path.join(ELE, 'academy.cjs'));
+  function installWithState(stateObj) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'academy-state-'));
+    if (stateObj) {
+      fs.writeFileSync(path.join(dir, 'academy-state.json'), JSON.stringify(stateObj));
+    }
+    let template = null;
+    const ctx = {
+      app: { getPath: () => dir, getName: () => 'Muse', setAboutPanelOptions: () => {} },
+      BrowserWindow: class {
+        static getAllWindows() { return []; }
+        static getFocusedWindow() { return null; }
+      },
+      Menu: {
+        buildFromTemplate: (t) => { template = t; return { items: [] }; },
+        setApplicationMenu: () => {},
+      },
+      dialog: { showMessageBox: async () => ({ response: 0 }) },
+      ipcMain: { handle: () => {}, on: () => {}, removeListener: () => {} },
+      buildLabel: 'test',
+    };
+    return { layer: academy.install(ctx), dir, template: () => template };
+  }
+  const a = installWithState({ markdownRoute: 'ask' });
+  assert.strictEqual(a.layer.getMarkdownRoute(), 'ask');
+  a.layer.setMarkdownRoute('system');
+  const saved = JSON.parse(fs.readFileSync(path.join(a.dir, 'academy-state.json'), 'utf8'));
+  assert.strictEqual(saved.markdownRoute, 'system', 'preference persists');
+  a.layer.setMarkdownRoute('bogus');
+  assert.strictEqual(a.layer.getMarkdownRoute(), 'system', 'invalid set rejected');
+  // The menu carries the radio submenu in the loaded state.
+  const view = a.template().find((t) => t.label === 'View');
+  const sub = view.submenu.find((i) => i.label === 'Markdown Files Open In');
+  assert.ok(sub, 'Markdown Files Open In submenu present');
+  assert.deepStrictEqual(sub.submenu.map((i) => i.label), ['MacDown', 'Ask Each Time', 'System Default']);
+  assert.strictEqual(sub.submenu.find((i) => i.label === 'Ask Each Time').checked, true);
+  const b = installWithState({ markdownRoute: 'bogus' });
+  assert.strictEqual(b.layer.getMarkdownRoute(), 'macdown', 'invalid persisted value falls back');
+  const c = installWithState(null);
+  assert.strictEqual(c.layer.getMarkdownRoute(), 'macdown', 'fresh install defaults to MacDown');
+});
+
+// Async router groups: the router's decision tree under a fake env.
+function fakeRouteEnv(overrides = {}) {
+  const calls = { openWithBundle: [], openSystemDefault: [], openDistro: 0, dialogs: [], bundleIdReads: [] };
+  const files = new Map();
+  const queue = (overrides.dialogQueue || []).slice();
+  const env = {
+    statSync: (p) => {
+      if (!files.has(p)) { const e = new Error('ENOENT'); e.code = 'ENOENT'; throw e; }
+      return { isFile: () => true, size: files.get(p) };
+    },
+    realpathSync: (p) => p,
+    readBundleId: (appPath) => {
+      calls.bundleIdReads.push(appPath);
+      return overrides.bundleIds ? overrides.bundleIds[appPath] || null : null;
+    },
+    homeDir: '/Users/tester',
+    openWithBundle: async (id, p) => { calls.openWithBundle.push([id, p]); return overrides.openOk !== false; },
+    openSystemDefault: async (p) => { calls.openSystemDefault.push(p); return true; },
+    openDistro: async () => { calls.openDistro += 1; return true; },
+    showMessageBox: async (opts) => {
+      calls.dialogs.push(opts);
+      return { response: queue.length ? queue.shift() : (overrides.dialogResponse ?? 0) };
+    },
+    getPreference: () => overrides.preference || 'macdown',
+    log: () => {},
+  };
+  return { env, calls, files };
+}
+
+async function okAsync(name, fn) {
+  await fn();
+  passed += 1;
+  console.log('ok -', name);
+}
+
+async function markdownRouterGroups() {
+  await okAsync('md-route: allowlist — un-noted paths never route; noted paths do', async () => {
+    const { env, calls, files } = fakeRouteEnv();
+    const router = mdRoute.createMarkdownRouter(env);
+    const dest = '/Users/tester/Downloads/piece.md';
+    files.set(dest, 1200);
+    const dl = { destination: dest, savePath: dest, filename: 'piece.md', mimeType: 'text/plain' };
+    assert.strictEqual(await router.handleCompletedDownload(dl), 'not-allowlisted');
+    assert.strictEqual(calls.openWithBundle.length, 0);
+    router.noteDownload(dest);
+    assert.strictEqual(await router.handleCompletedDownload(dl), 'routed-macdown');
+    assert.deepStrictEqual(calls.openWithBundle, [[mdRoute.MACDOWN_BUNDLE_ID, dest]]);
+  });
+
+  await okAsync('md-route: classifier + preference gates fire before any open', async () => {
+    const a = fakeRouteEnv();
+    const ra = mdRoute.createMarkdownRouter(a.env);
+    const zip = '/Users/tester/Downloads/evil.md';
+    a.files.set(zip, 10);
+    ra.noteDownload(zip);
+    assert.strictEqual(await ra.handleCompletedDownload({ destination: zip, savePath: zip, filename: 'evil.md', mimeType: 'application/zip' }), 'not-markdown');
+    assert.strictEqual(a.calls.dialogs.length, 0);
+    const b = fakeRouteEnv({ preference: 'system' });
+    const rb = mdRoute.createMarkdownRouter(b.env);
+    const ok1 = '/Users/tester/Downloads/ok.md';
+    b.files.set(ok1, 10);
+    rb.noteDownload(ok1);
+    assert.strictEqual(await rb.handleCompletedDownload({ destination: ok1, savePath: ok1, filename: 'ok.md', mimeType: '' }), 'preference-system');
+    assert.strictEqual(b.calls.openWithBundle.length, 0);
+    const c = fakeRouteEnv();
+    const rc = mdRoute.createMarkdownRouter(c.env);
+    const gone = '/Users/tester/Downloads/gone.md';
+    rc.noteDownload(gone); // noted, then the file vanishes before completion handling
+    assert.strictEqual(await rc.handleCompletedDownload({ destination: gone, savePath: gone, filename: 'gone.md', mimeType: '' }), 'missing');
+  });
+
+  await okAsync('md-route: Ask Each Time maps buttons to outcomes', async () => {
+    async function askCase(response) {
+      const f = fakeRouteEnv({ preference: 'ask', dialogQueue: [response] });
+      const r = mdRoute.createMarkdownRouter(f.env);
+      const dest = '/Users/tester/Downloads/ask.md';
+      f.files.set(dest, 500);
+      r.noteDownload(dest);
+      const outcome = await r.handleCompletedDownload({ destination: dest, savePath: dest, filename: 'ask.md', mimeType: 'text/plain' });
+      return { outcome, f };
+    }
+    const mac = await askCase(0);
+    assert.strictEqual(mac.outcome, 'routed-macdown');
+    assert.deepStrictEqual(mac.f.calls.dialogs[0].buttons, ['MacDown', 'System Default', 'Downloads Only']);
+    const sys = await askCase(1);
+    assert.strictEqual(sys.outcome, 'ask-system');
+    assert.deepStrictEqual(sys.f.calls.openSystemDefault, ['/Users/tester/Downloads/ask.md']);
+    const only = await askCase(2);
+    assert.strictEqual(only.outcome, 'ask-downloads-only');
+    assert.strictEqual(only.f.calls.openWithBundle.length, 0);
+  });
+
+  await okAsync('md-route: detection order, then open failure falls into the absent dialog', async () => {
+    // Detection: /Applications first, home second; home hit wins.
+    const probe = fakeRouteEnv({ bundleIds: { '/Users/tester/Applications/MacDown.app': mdRoute.MACDOWN_BUNDLE_ID } });
+    const probeRouter = mdRoute.createMarkdownRouter(probe.env);
+    assert.strictEqual(probeRouter.detectMacDown(), true);
+    assert.deepStrictEqual(probe.calls.bundleIdReads, ['/Applications/MacDown.app', '/Users/tester/Applications/MacDown.app']);
+    // Absence: open fails -> fallback dialog; buttons map per design.
+    async function absentCase(response) {
+      const f = fakeRouteEnv({ openOk: false, dialogQueue: [response] });
+      const r = mdRoute.createMarkdownRouter(f.env);
+      const dest = '/Users/tester/Downloads/lonely.md';
+      f.files.set(dest, 42);
+      r.noteDownload(dest);
+      const outcome = await r.handleCompletedDownload({ destination: dest, savePath: dest, filename: 'lonely.md', mimeType: '' });
+      return { outcome, f };
+    }
+    const distro = await absentCase(0);
+    assert.strictEqual(distro.outcome, 'absent-distro');
+    assert.strictEqual(distro.f.calls.openDistro, 1);
+    assert.deepStrictEqual(distro.f.calls.dialogs[0].buttons, ['Get MacDown in Distro', 'Open with System Default', 'Keep in Downloads']);
+    const sysd = await absentCase(1);
+    assert.strictEqual(sysd.outcome, 'absent-system');
+    assert.deepStrictEqual(sysd.f.calls.openSystemDefault, ['/Users/tester/Downloads/lonely.md']);
+    const kept = await absentCase(2);
+    assert.strictEqual(kept.outcome, 'absent-kept');
+    assert.strictEqual(kept.f.calls.openDistro, 0);
+  });
+
+  await okAsync('md-route: oversize guard asks before opening; constant is the design value', async () => {
+    assert.strictEqual(mdRoute.ROUTE_MAX_BYTES, 10 * 1024 * 1024);
+    const big = '/Users/tester/Downloads/big.md';
+    const decline = fakeRouteEnv({ dialogQueue: [1] });
+    const rd = mdRoute.createMarkdownRouter(decline.env);
+    decline.files.set(big, mdRoute.ROUTE_MAX_BYTES + 1);
+    rd.noteDownload(big);
+    assert.strictEqual(await rd.handleCompletedDownload({ destination: big, savePath: big, filename: 'big.md', mimeType: '' }), 'kept-oversize');
+    assert.deepStrictEqual(decline.calls.dialogs[0].buttons, ['Open Anyway', 'Keep in Downloads']);
+    assert.strictEqual(decline.calls.openWithBundle.length, 0);
+    const accept = fakeRouteEnv({ dialogQueue: [0] });
+    const ra = mdRoute.createMarkdownRouter(accept.env);
+    accept.files.set(big, mdRoute.ROUTE_MAX_BYTES + 1);
+    ra.noteDownload(big);
+    assert.strictEqual(await ra.handleCompletedDownload({ destination: big, savePath: big, filename: 'big.md', mimeType: '' }), 'routed-macdown');
+  });
+
+  await okAsync('md-route: completion-path mismatch refuses the open (TOCTOU guard)', async () => {
+    const f = fakeRouteEnv();
+    const r = mdRoute.createMarkdownRouter(f.env);
+    const dest = '/Users/tester/Downloads/piece.md';
+    f.files.set(dest, 10);
+    r.noteDownload(dest);
+    const outcome = await r.handleCompletedDownload({ destination: dest, savePath: '/Users/tester/Downloads/other.md', filename: 'piece.md', mimeType: '' });
+    // The open is refused, so the flow lands in the absent/failure
+    // dialog (default fake response 0 = Get MacDown in Distro) —
+    // what matters is that openWithBundle never fired for the file.
+    assert.strictEqual(outcome, 'absent-distro');
+    assert.strictEqual(f.calls.openWithBundle.length, 0, 'open never attempted on a mismatched path');
+  });
+}
+
+markdownRouterGroups()
+  .then(() => {
+    console.log('\nALL ' + passed + ' TEST GROUPS PASSED');
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

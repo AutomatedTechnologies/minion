@@ -10,7 +10,14 @@
  *  - Terminal skin: a persisted preference toggled from the View
  *    menu; the stylesheet text is served to the preload, which
  *    gates it on the html.academy-terminal class. SDS monochrome —
- *    see terminal-skin.css.
+ *    see terminal-skin.css. The academy2 sheet is whitelist-built
+ *    (the academy1 sheet failed on the real hosted UI — owner
+ *    screenshot 2026-11-10 17:08 EST, files/19), and the persisted
+ *    preference is epoch-gated (SKIN_EPOCH): a state file written
+ *    before the current epoch loads with the skin OFF, so an
+ *    upgrade can never re-apply a superseded skin unasked, and a
+ *    fresh install defaults OFF. Only an explicit toggle in a
+ *    build of the current epoch persists ON.
  *  - SDS-8 welcome: a local welcome window (welcome.html + the
  *    library startup sound) shown once, on first launch; replayable
  *    from the app menu. Never blocks the service window beyond the
@@ -29,6 +36,14 @@ const { createHistoryStore } = require('./history.cjs');
 const { isMuseOrigin } = require('./utils.cjs');
 
 const STATE_FILE = 'academy-state.json';
+
+// Terminal-skin preference epoch. Epoch 2 = the whitelist-rebuilt
+// sheet (0.4.0-academy2). A persisted skin preference is honored
+// only when the state file carries the CURRENT epoch; anything
+// older (including every academy1 state file, which has no epoch)
+// loads with the skin OFF and must be re-enabled by hand. Bump
+// this whenever the sheet's discipline changes materially.
+const SKIN_EPOCH = 2;
 
 function earlyInit(app) {
   // The SDS-8 startup sound plays from the welcome window without a
@@ -58,7 +73,12 @@ function install(ctx) {
       const data = JSON.parse(fs.readFileSync(statePath, 'utf8'));
       if (data && typeof data === 'object') {
         store.load(data.history);
-        terminalSkin = data.terminalSkin === true;
+        // Epoch gate: a pre-epoch (or older-epoch) state file must
+        // not resurrect a superseded skin on upgrade — the academy1
+        // preference, written while its chaotic sheet was live, is
+        // deliberately dropped here; the owner re-enables the skin
+        // explicitly if he wants the rebuilt one.
+        terminalSkin = data.skinEpoch >= SKIN_EPOCH && data.terminalSkin === true;
         welcomeSeen = data.welcomeSeen === true;
         if (data.window && typeof data.window === 'object') {
           windowState = {
@@ -79,6 +99,7 @@ function install(ctx) {
         version: 1,
         history: store.toJSON(),
         terminalSkin: terminalSkin,
+        skinEpoch: SKIN_EPOCH,
         welcomeSeen: welcomeSeen,
         window: windowState,
       }), { mode: 0o600 });
@@ -340,7 +361,7 @@ function install(ctx) {
 
   app.setAboutPanelOptions({
     applicationName: 'Muse (Academy Build)',
-    applicationVersion: ctx.buildLabel || '0.4.0-academy1',
+    applicationVersion: ctx.buildLabel || '0.4.0-academy2',
     version: '0.4.0',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +

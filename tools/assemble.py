@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Assemble Muse-Academy-1013-x64.zip — Muse (Academy Build) 0.4.0-academy5.
+"""Assemble Muse-Academy-1013-x64.zip — Minion 0.4.0-minion1.
 
 Construction of record (Distro files/06): the official Electron
 v22.3.27 darwin-x64 distribution (SHA-256 pinned below — a mismatch
 halts the build), plus the sanctioned changed set:
 
-  1. Electron.app renamed to Muse.app; MacOS/Electron -> MacOS/Muse
+  1. Electron.app renamed to Minion.app; MacOS/Electron -> MacOS/Minion
      (bytes identical).
   2. Stock electron.icns removed; Academy icon.icns added (assets/).
   3. Contents/Resources/app/ added from app/ (upstream muse-desktop
@@ -160,10 +160,10 @@ def write_zip(tree_root, out_path):
             p = os.path.join(base, fn)
             entries.append((arc_prefix + fn, p, False, os.path.islink(p)))
 
-    app_root = os.path.join(tree_root, "Muse.app")
+    app_root = os.path.join(tree_root, "Minion.app")
     entries.append(("INSTALL.txt", os.path.join(tree_root, "INSTALL.txt"), False, False))
-    entries.append(("Muse.app/", app_root, True, False))
-    walk(app_root, "Muse.app/")
+    entries.append(("Minion.app/", app_root, True, False))
+    walk(app_root, "Minion.app/")
 
     out = zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6)
     import datetime
@@ -211,14 +211,14 @@ def main():
     try:
         extract_preserving(args.dist, work)
         src_app = os.path.join(work, "Electron.app")
-        dst_app = os.path.join(work, "pkg", "Muse.app")
+        dst_app = os.path.join(work, "pkg", "Minion.app")
         os.makedirs(os.path.join(work, "pkg"))
         shutil.move(src_app, dst_app)
 
         # 1. Launcher stub rename (bytes identical).
         os.rename(
             os.path.join(dst_app, "Contents", "MacOS", "Electron"),
-            os.path.join(dst_app, "Contents", "MacOS", "Muse"),
+            os.path.join(dst_app, "Contents", "MacOS", "Minion"),
         )
         # 2. Icon swap.
         os.remove(os.path.join(dst_app, "Contents", "Resources", "electron.icns"))
@@ -240,18 +240,20 @@ def main():
         plist_path = os.path.join(dst_app, "Contents", "Info.plist")
         with open(plist_path, "rb") as f:
             plist = plistlib.load(f)
-        plist["CFBundleDisplayName"] = "Muse"
-        plist["CFBundleExecutable"] = "Muse"
+        plist["CFBundleDisplayName"] = "Minion"
+        plist["CFBundleExecutable"] = "Minion"
         plist["CFBundleIconFile"] = "icon.icns"
-        # academy5: the Academy bundle identity. The ai.muse.desktop
-        # carve-out the earlier builds shipped under was revoked by
-        # the owner 2026-11-10 21:14 EST ("nothing hits Distro
-        # without a disassembly and rebuild"); this build is the
+        # minion1: the app is Minion. academy5 first carried the
+        # Academy bundle identity after the owner revoked the
+        # ai.muse.desktop carve-out 2026-11-10 21:14 EST ("nothing
+        # hits Distro without a disassembly and rebuild"); the
+        # owner then renamed the app itself (2026-11-10 21:49 EST:
+        # "rename academy muse to minion"), so this build — the
         # line's own disassembly/scan/rebuild (files/19 sections
-        # 2-10) and carries the Academy identifier like every other
-        # listing.
-        plist["CFBundleIdentifier"] = "com.detroitautomationacademy.muse"
-        plist["CFBundleName"] = "Muse"
+        # 2-11) — ships as Minion under
+        # com.detroitautomationacademy.minion.
+        plist["CFBundleIdentifier"] = "com.detroitautomationacademy.minion"
+        plist["CFBundleName"] = "Minion"
         plist["CFBundleShortVersionString"] = VERSION
         plist["CFBundleVersion"] = VERSION
         plist["com.detroitautomationacademy.audit"] = AUDIT
@@ -287,8 +289,8 @@ def main():
     # --- Self-verification of the finished artifact ---
     z = zipfile.ZipFile(args.out)
     names = z.namelist()
-    plist = plistlib.loads(z.read("Muse.app/Contents/Info.plist"))
-    assert plist["CFBundleIdentifier"] == "com.detroitautomationacademy.muse", "bundle id drifted"
+    plist = plistlib.loads(z.read("Minion.app/Contents/Info.plist"))
+    assert plist["CFBundleIdentifier"] == "com.detroitautomationacademy.minion", "bundle id drifted"
     assert plist["CFBundleShortVersionString"] == VERSION, "short version drifted"
     assert plist["CFBundleVersion"] == VERSION, "bundle version drifted"
     assert plist["LSMinimumSystemVersion"] == "10.13", "floor drifted"
@@ -301,9 +303,9 @@ def main():
         and conf.get("VersionAtStartup") is True and conf.get("StartupSound") is True \
         and conf.get("MenuBar") is True and conf.get("Authority") \
         and conf.get("Date"), "SDS-10 conformance entry incomplete"
-    sound = z.read("Muse.app/Contents/Resources/app/electron/startup-sound.wav")
+    sound = z.read("Minion.app/Contents/Resources/app/electron/startup-sound.wav")
     assert hashlib.sha256(sound).hexdigest() == STARTUP_SOUND_SHA256, "startup sound not byte-identical in the artifact"
-    icon = z.read("Muse.app/Contents/Resources/icon.icns")
+    icon = z.read("Minion.app/Contents/Resources/icon.icns")
     assert hashlib.sha256(icon).hexdigest() == sha256_file(os.path.join(args.assets, "icon.icns")), "icon drifted"
     assert not any(n.endswith("electron.icns") for n in names), "stock icon survived"
     # academy5: the rejected terminal skin is deleted, and the
@@ -311,7 +313,7 @@ def main():
     assert not any(n.endswith("terminal-skin.css") for n in names), \
         "terminal skin survived into the artifact"
     for rel in EXPECTED_APP_FILES:
-        assert f"Muse.app/Contents/Resources/app/{rel}" in names, f"missing app file {rel}"
+        assert f"Minion.app/Contents/Resources/app/{rel}" in names, f"missing app file {rel}"
     macho = 0
     for n in names:
         if n.endswith("/"):
@@ -323,7 +325,7 @@ def main():
     # AcademyLSDefault helper in Contents/Resources (16).
     expected_macho = 16 if args.ls_helper else 15
     if args.ls_helper:
-        assert "Muse.app/Contents/Resources/AcademyLSDefault" in names, \
+        assert "Minion.app/Contents/Resources/AcademyLSDefault" in names, \
             "ls-helper missing from the artifact"
     assert macho == expected_macho, f"Mach-O census {macho} != {expected_macho}"
     size = os.path.getsize(args.out)

@@ -1,4 +1,4 @@
-Minion 0.4.0-minion2 — for High Sierra, Intel (x64)
+Minion 0.4.0-minion3 — for High Sierra, Intel (x64)
 ====================================================
 
 What this is
@@ -28,7 +28,15 @@ first launch. The previous version's data remains untouched at
 ~/Library/Application Support/Muse, and removing either
 version's bundle never touches either data store. Nothing is
 migrated from the old store; Minion starts fresh (below).
-Everything from 0.4.0-academy5 stands:
+This build, 0.4.0-minion3, fixes the presentation. The window
+title bar now reads Minion: the hosted page's own title ("Muse")
+no longer replaces the app's name in the title bar — the page's
+title is the service's name for its content, and the title bar is
+the app's chrome. And the app presents DARK by default: a fresh
+profile opens dark. Dark is the default, not a lock — View menu →
+Appearance (Dark / Light / System) records your explicit choice,
+and that choice is what later launches apply. Everything from
+0.4.0-academy5 stands:
 
 - Terminal (View menu, or Command-T). A real terminal window of the
   app's own: monochrome, monospace, a scrollback, and a prompt line
@@ -110,11 +118,15 @@ shipped under upstream's ai.muse.desktop; the Academy's owner
 revoked that carve-out on 2026-11-10 ("nothing hits Distro without
 a disassembly and rebuild"), academy5 took the Academy identity
 com.detroitautomationacademy.muse, and the owner then renamed the
-app Minion the same evening (0.4.0-minion1). 0.4.0-minion2 (this
-build) separates the app's data into its own bundle-ID-keyed
+app Minion the same evening (0.4.0-minion1). 0.4.0-minion2
+separates the app's data into its own bundle-ID-keyed
 Application Support location under the owner's data-separation
 standard, and the catalog record declares Minion's predecessor:
-Muse (Academy Build), ai.muse.desktop. The audit entry carried in the bundle
+Muse (Academy Build), ai.muse.desktop. 0.4.0-minion3 (this
+build) pins the window title to Minion against the hosted page's
+title updates, and makes dark the default appearance (the owner's
+explicit Appearance choice, once made, supersedes the default).
+The audit entry carried in the bundle
 is earned by the line's own disassembly, scan, and rebuild: the
 upstream application layer and the stock Electron distribution were
 taken apart and audited, and the app is reassembled from the pinned

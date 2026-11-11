@@ -36,7 +36,7 @@ const {
   placementFor,
 } = require("./window-state.cjs");
 
-const ACADEMY_BUILD_LABEL = "0.4.0-academy5";
+const ACADEMY_BUILD_LABEL = "0.4.0-minion1";
 const ACADEMY_PRELOAD = path.join(__dirname, "preload.cjs");
 
 // Set by start() once the feature layer is installed; window
@@ -388,7 +388,7 @@ function createMuseWindow() {
   // windows partially off-screen (files/18 P1, fix spec 2026-11-08).
   const placement = mainWindowPlacement();
   const window = new BrowserWindow({
-    title: "Muse",
+    title: "Minion",
     x: placement.rect.x,
     y: placement.rect.y,
     width: placement.rect.width,

@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Minion v0.4.0-minion1 verification.
+ * run-tests.cjs — Minion v0.4.0-minion2 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -253,7 +253,7 @@ ok('academy5: the terminal skin is deleted, not disabled', () => {
   assert.ok(/terminal-preload\.cjs/.test(expectedBlock[1]), 'terminal preload expected in the artifact');
 });
 
-ok('minion1: bundle identity is the Academy identifier', () => {
+ok('minion2: bundle identity is the Academy identifier', () => {
   // Owner revocation 2026-11-10 21:14 EST: the ai.muse.desktop
   // carve-out is gone; the line ships under its Academy identity.
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
@@ -277,7 +277,7 @@ ok('minion1: bundle identity is the Academy identifier', () => {
   }
 });
 
-ok('minion1: the app is named Minion on every shipped surface', () => {
+ok('minion2: the app is named Minion on every shipped surface', () => {
   // Owner rename 2026-11-10 21:49 EST: "rename academy muse to
   // minion." The bundle, the windows, the menu, the welcome and the
   // terminal all carry the one name; the upstream identity survives
@@ -305,6 +305,25 @@ ok('minion1: the app is named Minion on every shipped surface', () => {
     'assembler stamps the Minion executable');
 });
 
+ok('minion2: app data stored separately, keyed to the bundle identity', () => {
+  // Owner coding standard (J dir 2026-11-10 22:18 EST): the
+  // app's data lives outside the bundle, in its own Application
+  // Support location keyed to the bundle ID. Minion's store is
+  // ~/Library/Application Support/com.detroitautomationacademy.minion;
+  // the previous version's pin (the bare "Muse" folder) must not
+  // survive in any shipped script — that store belongs to the
+  // previous version and stays untouched.
+  const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
+  assert.ok(/app\.setPath\("userData", path\.join\(app\.getPath\("appData"\), "com\.detroitautomationacademy\.minion"\)\)/.test(main),
+    'userData is pinned to the bundle-ID Application Support location');
+  const codeFiles = fs.readdirSync(ELE).filter((f) => f.endsWith('.cjs'));
+  for (const f of codeFiles) {
+    const text = fs.readFileSync(path.join(ELE, f), 'utf8');
+    assert.ok(!/getPath\("appData"\), "Muse"\)/.test(text),
+      'the previous version\'s data pin survives in ' + f);
+  }
+});
+
 ok('academy5: terminal page is a self-contained shell surface', () => {
   assertGrayscale(path.join(ELE, 'terminal.html'));
   const html = fs.readFileSync(path.join(ELE, 'terminal.html'), 'utf8');
@@ -326,7 +345,7 @@ ok('academy5: terminal page is a self-contained shell surface', () => {
 
 ok('academy5: terminal wiring across main, academy, preload', () => {
   const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
-  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.0-minion1"/.test(main), 'build label is minion1');
+  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.0-minion2"/.test(main), 'build label is minion2');
   assert.ok(/__academyTerminal/.test(main), 'activate handler can tell the terminal window apart');
   const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
   assert.ok(/label: 'Terminal'/.test(academy), 'View menu carries the Terminal item');
@@ -833,7 +852,7 @@ async function terminalBehaviorGroups() {
         on: (channel, fn) => listeners.set(channel, fn),
         removeListener: () => {},
       },
-      buildLabel: '0.4.0-minion1',
+      buildLabel: '0.4.0-minion2',
     };
     const layer = academy.install(ctx);
 
@@ -899,7 +918,7 @@ async function terminalBehaviorGroups() {
 
     // Build info is the runtime plist version for the terminal only.
     assert.deepStrictEqual(await info({ sender: termWin.webContents }),
-      { name: 'Minion', version: '0.4.0', build: '0.4.0-minion1' });
+      { name: 'Minion', version: '0.4.0', build: '0.4.0-minion2' });
     assert.strictEqual(await info({ sender: hostWin.webContents }), null);
   });
 }

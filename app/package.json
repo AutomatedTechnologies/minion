@@ -16,8 +16,8 @@
     "electron-builder": "^26.0.12"
   },
   "build": {
-    "appId": "com.detroitautomationacademy.muse",
-    "productName": "Muse",
+    "appId": "com.detroitautomationacademy.minion",
+    "productName": "Minion",
     "artifactName": "Muse-${version}-${os}-${arch}.${ext}",
     "files": [
       "electron/**/*",

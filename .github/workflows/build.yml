@@ -7,7 +7,28 @@ permissions:
   contents: write
 
 jobs:
+  helper:
+    runs-on: macos-14
+    steps:
+      - name: Check out build source
+        uses: actions/checkout@v4
+
+      - name: Compile AcademyLSDefault (MD-T3 helper, 10.13 floor, x86_64)
+        run: |
+          clang -arch x86_64 -mmacosx-version-min=10.13 \
+            -framework CoreServices -framework Foundation \
+            -o AcademyLSDefault tools/AcademyLSDefault.m
+          file AcademyLSDefault
+          otool -l AcademyLSDefault | grep -A1 LC_VERSION_MIN_MACOSX || true
+
+      - name: Upload the helper
+        uses: actions/upload-artifact@v4
+        with:
+          name: ls-helper
+          path: AcademyLSDefault
+
   build:
+    needs: helper
     runs-on: ubuntu-latest
     steps:
       - name: Check out build source
@@ -15,6 +36,11 @@ jobs:
 
       - name: Unit tests (history, window-state, skin, markdown routing + SDS-10 scans)
         run: node test/run-tests.cjs
+
+      - name: Download the MD-T3 helper
+        uses: actions/download-artifact@v4
+        with:
+          name: ls-helper
 
       - name: Fetch the pinned Electron distribution
         run: |
@@ -25,13 +51,14 @@ jobs:
         run: |
           python3 tools/assemble.py \
             --dist electron.zip --app app --assets assets \
+            --ls-helper AcademyLSDefault \
             --out Muse-Academy-1013-x64.zip
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create muse-academy-0.4.0-academy3 \
+          gh release create muse-academy-0.4.0-academy4 \
             Muse-Academy-1013-x64.zip \
-            --title "Muse (Academy Build) 0.4.0-academy3" \
-            --notes "Markdown files open in MacDown by default (owner directive 2026-11-10; design in Distro files/24, tranche MD-T1). When a download completes in the app and it is markdown (.md/.markdown, binary payloads vetoed by MIME), the shell opens it in MacDown, the Academy's markdown editor — the file itself stays in Downloads, nothing is moved or deleted. The routing lives entirely in the main process: no preload or page-side change (preload.cjs and terminal-skin.css are byte-identical to academy2), and the router opens only destinations the shell itself downloaded this session. A View-menu preference (Markdown Files Open In: MacDown / Ask Each Time / System Default) controls it; files over 10 MiB ask first; if MacDown is not installed, a dialog offers Distro, the system default, or keeping the file in Downloads. Everything else stands from academy2: the whitelist terminal skin, window-management repair, up-arrow sent-message history (per conversation, stored on this Mac only), SDS-8 welcome with the library startup sound, SDS-10 conformance + Academy audit entries in the bundle. Built from the open-source muse-desktop v0.3.0 (MIT) on the pinned Electron 22.3.27 distribution. Unsigned test build. Unofficial build: not a Meta product and not endorsed by Meta."
+            --title "Muse (Academy Build) 0.4.0-academy4" \
+            --notes "Markdown routing completes its design (Distro files/24): the consented system default (MD-T3) and the Distro deep link (DISTRO-DL1). New in academy4: after the first successful route to MacDown, Muse offers once — Make Default / Not Now / Never Ask — to make MacDown the default app for markdown files everywhere on the Mac. The change is made only on an explicit yes, by the bundled AcademyLSDefault helper, for markdown files only (plain text is never touched); the previous default is recorded first and restored if the standing View-menu checkbox is later unchecked. The fallback dialog's Get MacDown in Distro button now deep-links (academy-distro://app/macdown) straight to MacDown's page in Distro (distro-test-41+). Everything else stands from academy3: download routing to MacDown with its View-menu preference, the whitelist terminal skin, window repair, up-arrow history, SDS-8 welcome, SDS-10 identity — and preload.cjs and terminal-skin.css remain byte-identical to academy2. Built from the open-source muse-desktop v0.3.0 (MIT) on the pinned Electron 22.3.27 distribution. Unsigned test build. Unofficial build: not a Meta product and not endorsed by Meta."

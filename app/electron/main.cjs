@@ -36,7 +36,7 @@ const {
   placementFor,
 } = require("./window-state.cjs");
 
-const ACADEMY_BUILD_LABEL = "0.4.0-minion1";
+const ACADEMY_BUILD_LABEL = "0.4.0-minion2";
 const ACADEMY_PRELOAD = path.join(__dirname, "preload.cjs");
 
 // Set by start() once the feature layer is installed; window
@@ -464,8 +464,17 @@ function start() {
     app.setDesktopName("muse-desktop.desktop");
   }
 
-  // Keep browser profile data in a predictable, product-specific directory.
-  app.setPath("userData", path.join(app.getPath("appData"), "Muse"));
+  // App data stored separately (owner coding standard, J dir
+  // 2026-11-10 22:18 EST): the app's data lives outside the
+  // bundle, in its own Application Support location keyed to the
+  // bundle identity — ~/Library/Application Support/
+  // com.detroitautomationacademy.minion. Nothing user-data is
+  // kept inside the .app. The previous version (Muse (Academy
+  // Build), the declared predecessor) pinned its data to
+  // ~/Library/Application Support/Muse; that store stays
+  // untouched under its own location, and removing either
+  // version's bundle never touches either data store.
+  app.setPath("userData", path.join(app.getPath("appData"), "com.detroitautomationacademy.minion"));
 
   app.whenReady().then(() => {
     configureSession(session.fromPartition("persist:muse"));

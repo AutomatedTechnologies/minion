@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, screen, session, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -36,7 +36,7 @@ const {
   placementFor,
 } = require("./window-state.cjs");
 
-const ACADEMY_BUILD_LABEL = "0.4.0-minion2";
+const ACADEMY_BUILD_LABEL = "0.4.0-minion3";
 const ACADEMY_PRELOAD = path.join(__dirname, "preload.cjs");
 
 // Set by start() once the feature layer is installed; window
@@ -415,6 +415,24 @@ function createMuseWindow() {
   }
   trackWindowState(window);
 
+  // Title pin (owner directive 2026-11-10 22:36 EST): the window
+  // title is app chrome and reads "Minion". The BrowserWindow
+  // option above names it, but a loaded page replaces the window
+  // title with its own <title> on every navigation unless the
+  // update is refused — muse.ai's page title is "Muse", the
+  // service's name for its page, and the owner's Air screenshot
+  // showed exactly that standing in the title bar over the
+  // "Minion" app menu. Refuse the page's title updates and
+  // restate the app's name. Only the hosted window is pinned:
+  // popup windows are transient sign-in surfaces whose titles
+  // belong to their pages' content, and the shell's own windows
+  // (welcome, terminal) already carry Minion titles that their
+  // local pages agree with.
+  window.webContents.on("page-title-updated", (event) => {
+    event.preventDefault();
+  });
+  window.setTitle("Minion");
+
   configureWindowNavigation(window);
 
   window.once("ready-to-show", () => {
@@ -487,6 +505,7 @@ function start() {
       Menu,
       dialog,
       ipcMain,
+      nativeTheme,
       buildLabel: ACADEMY_BUILD_LABEL,
       lsDefault: createLsDefaultClient(),
     });

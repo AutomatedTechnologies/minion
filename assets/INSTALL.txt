@@ -1,4 +1,4 @@
-Muse (Academy Build) 0.4.0-academy1 — for High Sierra, Intel (x64)
+Muse (Academy Build) 0.4.0-academy5 — for High Sierra, Intel (x64)
 ==================================================================
 
 What this is
@@ -10,8 +10,19 @@ launch on Intel Macs running High Sierra. It is a focused window onto
 https://muse.ai with its own browser profile, native notifications,
 and the system file picker for uploads.
 
-Version 0.4.0-academy1 adds the Academy feature layer:
+Version 0.4.0-academy5 adds the Academy feature layer:
 
+- Terminal (View menu, or Command-T). A real terminal window of the
+  app's own: monochrome, monospace, a scrollback, and a prompt line
+  (minion ❯) with a proper bordered text field. Type a message and
+  press Enter and it is sent to Minion through this app's live
+  hosted session — the terminal drives the main window's message
+  box and reads the reply from the conversation as it renders.
+  Up/down arrows recall what you have sent; /help lists the local
+  commands (/clear, /view). The earlier "Terminal Skin" — a
+  stylesheet over the hosted page — was rejected and is deleted
+  outright in this build: no skin, no toggle, stock hosted UI
+  untouched.
 - Up-arrow message history. In the message box, press the up arrow
   to recall messages you have sent in this conversation, shell-style:
   up steps older, down steps newer, your half-typed draft is kept
@@ -19,12 +30,18 @@ Version 0.4.0-academy1 adds the Academy feature layer:
   message changes nothing until you send it. History is per
   conversation and is stored only on this Mac, in the app's own data
   folder. Clear it any time from the View menu.
-- Terminal Skin (View menu, or Shift-Command-T). A working terminal
-  interface in the Academy monochrome ramp: monospace type, a prompt
-  line on the message box, a bright cursor — black, white and grays,
-  no colour. Every send and attach path works exactly as before.
+- Markdown files open in MacDown. A .md / .markdown file you
+  download here opens in MacDown (the Academy's markdown editor)
+  instead of piling up in Downloads; the View menu can switch that
+  to Ask Each Time or the system default. After the first routed
+  file, the app offers — once, and only with your explicit yes — to
+  make MacDown the default for markdown files everywhere on the
+  Mac; the previous default is recorded first and restored if you
+  later uncheck the View-menu item. Plain text files are never
+  touched.
 - An SDS-8 welcome screen on first launch, and a window law: no
-  window of this app opens partially off-screen.
+  window of this app opens partially off-screen, and the main
+  window reopens where you left it.
 
 It is NOT signed or notarized (no Apple Developer identity), so macOS
 will warn on first launch. That is expected.
@@ -33,18 +50,23 @@ Install (on the MacBook Air running 10.13)
 ------------------------------------------
 1. Copy Muse-Academy-1013-x64.zip to the Mac and double-click it to
    unzip. You get Muse.app.
-2. Drag Muse.app into your Applications folder.
+2. Drag Muse.app into your Applications folder, replacing the
+   earlier Academy build if one is there.
 3. First launch: right-click (or Control-click) Muse.app and choose
    Open, then click Open in the dialog. (A plain double-click will be
    blocked by Gatekeeper because the app is unsigned; the right-click
-   route is the one-time bypass. You only do this once.)
-4. Sign in with your Meta account in the window that opens.
+   route is the one-time bypass.)
+4. Sign in with your Meta account in the window that opens. This
+   build carries a new bundle identity (see below), so macOS treats
+   it as a new app: expect to sign in again even if the earlier
+   build was signed in. Your message history and preferences are
+   kept — they live in the app's data folder, which did not move.
 
 Notes
 -----
 - Profile data lives in ~/Library/Application Support/Muse — delete
   that folder to sign out and reset the client completely. The
-  Academy state (message history, skin preference) lives in the same
+  Academy state (message history, preferences) lives in the same
   folder, in academy-state.json.
 - Downloads from Muse are saved to your Downloads folder, never
   overwriting an existing file of the same name.
@@ -58,8 +80,16 @@ Academy build (Distro)
 Assembled 2026-11-10 by Detroit Automation Academy for distribution
 through Distro. Application layer: upstream muse-desktop v0.3.0
 (MIT) plus the Academy feature layer described above; runtime is the
-stock Electron 22.3.27 distribution, byte-identical; bundle id
-ai.muse.desktop (upstream's own, kept deliberately — rebadging it
-would falsify provenance). The application icon is the Academy
-monochrome standard rendition. Unofficial build — not a Meta product
-and not endorsed by Meta.
+stock Electron 22.3.27 distribution, byte-identical. Bundle id
+com.detroitautomationacademy.muse — the Academy's own identifier.
+Earlier builds (academy1–academy4) shipped under upstream's
+ai.muse.desktop; the Academy's owner revoked that carve-out on
+2026-11-10 ("nothing hits Distro without a disassembly and
+rebuild"), so from academy5 the line carries the Academy bundle
+identity earned by its own disassembly, scan, and rebuild: the
+upstream application layer and the stock Electron distribution were
+taken apart and audited, and the app is reassembled from the pinned
+distribution plus the Academy layer by the build pipeline, with the
+audit entry carried in the bundle. The application icon is the
+Academy monochrome standard rendition. Unofficial build — not a
+Meta product and not endorsed by Meta.

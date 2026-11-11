@@ -35,7 +35,7 @@ const {
   placementFor,
 } = require("./window-state.cjs");
 
-const ACADEMY_BUILD_LABEL = "0.4.0-academy3";
+const ACADEMY_BUILD_LABEL = "0.4.0-academy4";
 const ACADEMY_PRELOAD = path.join(__dirname, "preload.cjs");
 
 // Set by start() once the feature layer is installed; window
@@ -67,6 +67,46 @@ function readBundleId(appPath) {
   }
 }
 
+// MD-T3 helper client (files/24 section 5b): the bundled
+// AcademyLSDefault binary speaks get | set | restore for
+// net.daringfireball.markdown only. A missing or failing helper
+// reads as "unavailable" everywhere — the feature degrades to
+// academy3 behavior, never to an error.
+function createLsDefaultClient() {
+  const helperPath = app.isPackaged
+    ? path.join(process.resourcesPath, "AcademyLSDefault")
+    : path.join(__dirname, "AcademyLSDefault");
+  const run = (args) =>
+    new Promise((resolve) => {
+      execFile(helperPath, args, { timeout: 5000 }, (error) =>
+        resolve(!error),
+      );
+    });
+  return {
+    available: () => {
+      try {
+        return fs.existsSync(helperPath);
+      } catch {
+        return false;
+      }
+    },
+    getSync: () => {
+      try {
+        const out = execFileSync(helperPath, ["get"], {
+          encoding: "utf8",
+          timeout: 5000,
+        });
+        const value = String(out).trim();
+        return value || null;
+      } catch {
+        return null;
+      }
+    },
+    set: () => run(["set"]),
+    restore: (bundleId) => run(["restore", bundleId]),
+  };
+}
+
 function installMarkdownRouter() {
   markdownRouter = createMarkdownRouter({
     statSync: (p) => fs.statSync(p),
@@ -78,7 +118,22 @@ function installMarkdownRouter() {
       const error = await shell.openPath(filePath);
       return error === "";
     },
-    openDistro: () => openWithBundleId(DISTRO_BUNDLE_ID),
+    openDistro: async () => {
+      // DISTRO-DL1: prefer the deep link — it lands on MacDown's
+      // detail pane, not just the storefront. If no handler claims
+      // the scheme (older Distro), fall back to opening the app.
+      try {
+        await shell.openExternal("academy-distro://app/macdown");
+        return true;
+      } catch {
+        return openWithBundleId(DISTRO_BUNDLE_ID);
+      }
+    },
+    onFirstSuccessfulRoute: () => {
+      // MD-T3: the one-time consented-default offer rides the
+      // first successful route of the session.
+      if (academyLayer) void academyLayer.offerMarkdownDefault();
+    },
     showMessageBox: (options) => {
       const win = BrowserWindow.getFocusedWindow();
       return win
@@ -422,6 +477,7 @@ function start() {
       dialog,
       ipcMain,
       buildLabel: ACADEMY_BUILD_LABEL,
+      lsDefault: createLsDefaultClient(),
     });
     installMarkdownRouter();
     academyLayer.gateWelcome(createMuseWindow);

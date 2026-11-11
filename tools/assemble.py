@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble Muse-Academy-1013-x64.zip — Muse (Academy Build) 0.4.0-academy3.
+"""Assemble Muse-Academy-1013-x64.zip — Muse (Academy Build) 0.4.0-academy4.
 
 Construction of record (Distro files/06): the official Electron
 v22.3.27 darwin-x64 distribution (SHA-256 pinned below — a mismatch
@@ -195,6 +195,10 @@ def main():
     ap.add_argument("--workdir", default=None,
                     help="parent dir for the assembly tempdir (default: system temp; "
                          "pass a big-disk path where /tmp is small)")
+    ap.add_argument("--ls-helper", default=None,
+                    help="path to the compiled AcademyLSDefault helper (MD-T3); "
+                         "copied to Contents/Resources/AcademyLSDefault (0755) "
+                         "and counted in the Mach-O census")
     args = ap.parse_args()
 
     digest = sha256_file(args.dist)
@@ -246,6 +250,13 @@ def main():
         plist["com.detroitautomationacademy.conformance"] = CONFORMANCE
         with open(plist_path, "wb") as f:
             plistlib.dump(plist, f, fmt=plistlib.FMT_XML)
+        # 4b. MD-T3 helper (academy4+): the LaunchServices helper
+        # ships in Contents/Resources, executable, beside the app
+        # layer — main.cjs finds it at process.resourcesPath.
+        if args.ls_helper:
+            helper_dst = os.path.join(dst_app, "Contents", "Resources", "AcademyLSDefault")
+            shutil.copyfile(args.ls_helper, helper_dst)
+            os.chmod(helper_dst, 0o755)
         # 5. INSTALL.txt at the package root.
         shutil.copyfile(
             os.path.join(args.assets, "INSTALL.txt"),
@@ -296,7 +307,13 @@ def main():
         head = z.read(n)[:4]
         if head in (b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf"):
             macho += 1
-    assert macho == 15, f"Mach-O census {macho} != 15"
+    # 15 = the Electron distribution's binaries; academy4 adds the
+    # AcademyLSDefault helper in Contents/Resources (16).
+    expected_macho = 16 if args.ls_helper else 15
+    if args.ls_helper:
+        assert "Muse.app/Contents/Resources/AcademyLSDefault" in names, \
+            "ls-helper missing from the artifact"
+    assert macho == expected_macho, f"Mach-O census {macho} != {expected_macho}"
     size = os.path.getsize(args.out)
     print(json.dumps({
         "size_bytes": size,

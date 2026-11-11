@@ -40,6 +40,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHistoryStore } = require('./history.cjs');
 const { isMuseOrigin } = require('./utils.cjs');
+const { MACDOWN_BUNDLE_ID } = require('./md-route.cjs');
 
 const STATE_FILE = 'academy-state.json';
 
@@ -73,6 +74,13 @@ function install(ctx) {
   // the owner's directive is the consent for Muse-internal
   // behavior. Finder and every other app are untouched by it.
   let markdownRoute = 'macdown';
+  // Consented system default (files/24 section 5b, MD-T3): the
+  // handler recorded BEFORE any set this app performs (restored
+  // when the owner unchecks the menu item), and the Never Ask
+  // suppression for the one-time offer after a first route.
+  let markdownDefaultPrevHandler = null;
+  let markdownDefaultNeverAsk = false;
+  let markdownDefaultOfferedThisSession = false;
   // Window-management repair: the main window's normal bounds +
   // maximized flag, persisted so the app reopens where the owner
   // left it — validated against the current displays on restore
@@ -94,6 +102,11 @@ function install(ctx) {
         if (['macdown', 'ask', 'system'].includes(data.markdownRoute)) {
           markdownRoute = data.markdownRoute;
         }
+        if (typeof data.markdownDefaultPrevHandler === 'string' &&
+            data.markdownDefaultPrevHandler) {
+          markdownDefaultPrevHandler = data.markdownDefaultPrevHandler;
+        }
+        markdownDefaultNeverAsk = data.markdownDefaultNeverAsk === true;
         if (data.window && typeof data.window === 'object') {
           windowState = {
             bounds: data.window.bounds || null,
@@ -116,6 +129,8 @@ function install(ctx) {
         skinEpoch: SKIN_EPOCH,
         welcomeSeen: welcomeSeen,
         markdownRoute: markdownRoute,
+        markdownDefaultPrevHandler: markdownDefaultPrevHandler,
+        markdownDefaultNeverAsk: markdownDefaultNeverAsk,
         window: windowState,
       }), { mode: 0o600 });
       fs.renameSync(tmp, statePath);
@@ -187,6 +202,106 @@ function install(ctx) {
     if (!['macdown', 'ask', 'system'].includes(route)) return;
     markdownRoute = route;
     saveState();
+  }
+
+  // ---- Consented system default (files/24 section 5b, MD-T3) ----
+  // The bundled AcademyLSDefault helper (injected as ctx.lsDefault
+  // by main) is the only path to LaunchServices: get / set /
+  // restore for net.daringfireball.markdown only. The menu checkbox
+  // reads LIVE LS state at menu-build time — never the app's own
+  // bookkeeping — so a change made in Finder shows truthfully here.
+
+  function markdownDefaultIsCurrent() {
+    try {
+      return Boolean(ctx.lsDefault) &&
+        ctx.lsDefault.getSync() === MACDOWN_BUNDLE_ID;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async function infoDialog(title, message) {
+    const win = BrowserWindow.getFocusedWindow() || undefined;
+    const options = { type: 'info', title: title, message: title, detail: message, buttons: ['OK'], defaultId: 0 };
+    try {
+      if (win) { await dialog.showMessageBox(win, options); }
+      else { await dialog.showMessageBox(options); }
+    } catch (error) { /* the fact stands without the dialog */ }
+  }
+
+  async function setMarkdownDefaultEnabled(enabled) {
+    if (!ctx.lsDefault) return;
+    if (enabled) {
+      const prev = ctx.lsDefault.getSync();
+      if (prev === MACDOWN_BUNDLE_ID) { buildMenu(); return; }
+      // Record the predecessor BEFORE the set — the restore on
+      // uncheck depends on this ordering.
+      if (prev) {
+        markdownDefaultPrevHandler = prev;
+        saveState();
+      }
+      const ok = await ctx.lsDefault.set();
+      if (!ok) {
+        await infoDialog(
+          'Couldn’t make MacDown the default',
+          'LaunchServices did not accept the change. Markdown files you download in Muse still open in MacDown; only the system-wide default is unchanged.');
+      }
+    } else {
+      const prev = markdownDefaultPrevHandler;
+      if (prev) {
+        const ok = await ctx.lsDefault.restore(prev);
+        if (ok) {
+          markdownDefaultPrevHandler = null;
+          saveState();
+        } else {
+          await infoDialog(
+            'Couldn’t restore the previous default',
+            'LaunchServices did not accept the restore. The previous handler is still recorded; try again, or set the default in Finder (Get Info → Open With → Change All…).');
+        }
+      } else {
+        await infoDialog(
+          'Choose the default in Finder',
+          'This app has no recorded previous default for markdown files, so there is nothing to restore. To pick one: right-click any .md file in Finder, choose Get Info, select an app under “Open with”, then click “Change All…”.');
+      }
+    }
+    buildMenu();
+  }
+
+  // The one-time offer, fired by the router after the first
+  // successful route of a session (main wires it). Not Now may be
+  // offered again on a later session's first route; Never Ask is
+  // persisted and ends the offers permanently.
+  async function offerMarkdownDefault() {
+    if (markdownDefaultOfferedThisSession) return;
+    markdownDefaultOfferedThisSession = true;
+    if (markdownDefaultNeverAsk) return;
+    if (!ctx.lsDefault || !ctx.lsDefault.available()) return;
+    if (markdownDefaultIsCurrent()) return;
+    const win = BrowserWindow.getFocusedWindow() || undefined;
+    const options = {
+      type: 'question',
+      title: 'Make MacDown the default for markdown files?',
+      message: 'Make MacDown the default for markdown files?',
+      detail: 'MacDown already opens the markdown files you download in Muse. You can also make it the default app for markdown files everywhere on this Mac, Finder included. This changes only markdown files — plain text files are not affected. You can undo it any time in the View menu.',
+      buttons: ['Make Default', 'Not Now', 'Never Ask'],
+      defaultId: 0,
+      cancelId: 1,
+    };
+    let response = 1;
+    try {
+      const result = win
+        ? await dialog.showMessageBox(win, options)
+        : await dialog.showMessageBox(options);
+      response = result.response;
+    } catch (error) {
+      return;
+    }
+    if (response === 0) {
+      await setMarkdownDefaultEnabled(true);
+    } else if (response === 2) {
+      markdownDefaultNeverAsk = true;
+      saveState();
+    }
   }
 
   // SDS-10 clause 2: the welcome page asks for the build's version;
@@ -337,6 +452,14 @@ function install(ctx) {
               },
             ],
           },
+          { type: 'separator' },
+          {
+            label: 'Also Make MacDown the Default for Markdown Files',
+            type: 'checkbox',
+            checked: markdownDefaultIsCurrent(),
+            enabled: Boolean(ctx.lsDefault),
+            click: (item) => { void setMarkdownDefaultEnabled(item.checked); },
+          },
           {
             label: 'Clear Saved Message History…',
             click: async () => {
@@ -420,6 +543,13 @@ function install(ctx) {
     isTerminalSkin: () => terminalSkin,
     getMarkdownRoute: () => markdownRoute,
     setMarkdownRoute: setMarkdownRoute,
+    offerMarkdownDefault: offerMarkdownDefault,
+    setMarkdownDefaultEnabled: setMarkdownDefaultEnabled,
+    getMarkdownDefaultState: () => ({
+      prevHandler: markdownDefaultPrevHandler,
+      neverAsk: markdownDefaultNeverAsk,
+      isCurrent: markdownDefaultIsCurrent(),
+    }),
     getWindowState: () => windowState,
     setWindowState: (bounds, isMaximized) => {
       windowState = { bounds: bounds || null, isMaximized: !!isMaximized };

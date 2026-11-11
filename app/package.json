@@ -16,7 +16,7 @@
     "electron-builder": "^26.0.12"
   },
   "build": {
-    "appId": "ai.muse.desktop",
+    "appId": "com.detroitautomationacademy.muse",
     "productName": "Muse",
     "artifactName": "Muse-${version}-${os}-${arch}.${ext}",
     "files": [

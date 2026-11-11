@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble Muse-Academy-1013-x64.zip — Minion 0.4.0-minion2.
+"""Assemble Muse-Academy-1013-x64.zip — Minion 0.4.0-minion3.
 
 Construction of record (Distro files/06): the official Electron
 v22.3.27 darwin-x64 distribution (SHA-256 pinned below — a mismatch

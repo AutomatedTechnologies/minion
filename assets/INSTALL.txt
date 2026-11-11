@@ -1,4 +1,4 @@
-Minion 0.4.0-minion1 — for High Sierra, Intel (x64)
+Minion 0.4.0-minion2 — for High Sierra, Intel (x64)
 ====================================================
 
 What this is
@@ -12,12 +12,23 @@ browser profile, native notifications, and the system file picker
 for uploads. It is an unofficial build: not a Meta product and not
 endorsed by Meta.
 
-This build (0.4.0-minion1) is the rename. The app formerly listed in
-Distro as "Muse (Academy Build)" is now Minion, under the Academy
-bundle identity com.detroitautomationacademy.minion, with a new
-icon: the Minion mark — the scheming side-eye dog — rendered to the
-Academy monochrome standard (white tile, ink artwork, no black
-field). Everything from 0.4.0-academy5 stands:
+Minion is the renamed successor of Muse (Academy Build) — that
+app, bundle ai.muse.desktop, is its declared predecessor: when
+Minion installs through Distro, the previous version is the one
+it replaces. 0.4.0-minion1 carried out the rename (the app is
+Minion on every surface, under the Academy bundle identity
+com.detroitautomationacademy.minion, with a new icon: the Minion
+mark — the scheming side-eye dog — rendered to the Academy
+monochrome standard, white tile, ink artwork, no black field).
+This build, 0.4.0-minion2, adds the data separation: Minion
+keeps no user data inside the app bundle. Its data lives at
+~/Library/Application Support/com.detroitautomationacademy.minion
+— a fresh location under the new bundle identity, created on
+first launch. The previous version's data remains untouched at
+~/Library/Application Support/Muse, and removing either
+version's bundle never touches either data store. Nothing is
+migrated from the old store; Minion starts fresh (below).
+Everything from 0.4.0-academy5 stands:
 
 - Terminal (View menu, or Command-T). A real terminal window of the
   app's own: monochrome, monospace, a scrollback, and a prompt line
@@ -64,17 +75,22 @@ Install (on the MacBook Air running 10.13)
    will be blocked by Gatekeeper because the app is unsigned; the
    right-click route is the one-time bypass.)
 4. Sign in with your Meta account in the window that opens. Minion
-   carries a new bundle identity, so macOS treats it as a new app:
-   expect to sign in again even if the earlier build was signed in.
-   Your message history and preferences are kept — they live in the
-   app's data folder (below), which did not move.
+   is a new app under a new bundle identity, with its own fresh
+   data store (below): expect to sign in again, and expect a
+   fresh start — the previous version's history and preferences
+   stay in the previous version's own data store, untouched, and
+   are not migrated.
 
 Notes
 -----
-- Profile data lives in ~/Library/Application Support/Muse — delete
-  that folder to sign out and reset the client completely. The
-  Academy state (message history, preferences) lives in the same
-  folder, in academy-state.json.
+- Minion's data lives outside the bundle, in its own Application
+  Support location: ~/Library/Application Support/
+  com.detroitautomationacademy.minion — delete that folder to sign
+  out and reset Minion completely. The Academy state (message
+  history, preferences) lives in the same folder, in
+  academy-state.json. The previous version's data remains
+  untouched at ~/Library/Application Support/Muse; deleting
+  Minion.app (or the old Muse.app) never touches either store.
 - Downloads from Muse are saved to your Downloads folder, never
   overwriting an existing file of the same name.
 - Links that leave Muse open in your default browser; sign-in popups
@@ -94,7 +110,11 @@ shipped under upstream's ai.muse.desktop; the Academy's owner
 revoked that carve-out on 2026-11-10 ("nothing hits Distro without
 a disassembly and rebuild"), academy5 took the Academy identity
 com.detroitautomationacademy.muse, and the owner then renamed the
-app Minion the same evening. The audit entry carried in the bundle
+app Minion the same evening (0.4.0-minion1). 0.4.0-minion2 (this
+build) separates the app's data into its own bundle-ID-keyed
+Application Support location under the owner's data-separation
+standard, and the catalog record declares Minion's predecessor:
+Muse (Academy Build), ai.muse.desktop. The audit entry carried in the bundle
 is earned by the line's own disassembly, scan, and rebuild: the
 upstream application layer and the stock Electron distribution were
 taken apart and audited, and the app is reassembled from the pinned

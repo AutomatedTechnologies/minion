@@ -693,7 +693,7 @@ function install(ctx) {
 
   app.setAboutPanelOptions({
     applicationName: 'Minion',
-    applicationVersion: ctx.buildLabel || '0.4.0-minion1',
+    applicationVersion: ctx.buildLabel || '0.4.0-minion2',
     version: '0.4.0',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +

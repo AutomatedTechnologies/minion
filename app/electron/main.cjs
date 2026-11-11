@@ -13,8 +13,9 @@ const {
 } = require("./utils.cjs");
 // Academy build (v0.4.0-academy): feature layer + window-management
 // repair (owner escalation 2026-11-10; defect register in files/19).
-// academy.cjs: sent-message history, terminal skin, SDS-8 welcome,
-// application menu, state persistence. window-law.cjs (T1 scaffold)
+// academy.cjs: sent-message history, terminal view (academy5; the
+// terminal skin it replaced is deleted), SDS-8 welcome, application
+// menu, state persistence. window-law.cjs (T1 scaffold)
 // supplies the clamp; window-state.cjs the restore validation +
 // cascade geometry. The law applied: no window opens partially
 // off-screen, no window opens exactly on top of the active one,
@@ -35,7 +36,7 @@ const {
   placementFor,
 } = require("./window-state.cjs");
 
-const ACADEMY_BUILD_LABEL = "0.4.0-academy4";
+const ACADEMY_BUILD_LABEL = "0.4.0-academy5";
 const ACADEMY_PRELOAD = path.join(__dirname, "preload.cjs");
 
 // Set by start() once the feature layer is installed; window
@@ -343,8 +344,9 @@ function configureWindowNavigation(window, isPopup = false) {
           sandbox: true,
           webSecurity: true,
           partition: "persist:muse",
-          // Academy build: the feature preload (history + skin)
-          // applies to popup windows on the muse.ai origin too.
+          // Academy build: the feature preload (history + terminal
+          // bridge) applies to popup windows on the muse.ai origin
+          // too.
           preload: ACADEMY_PRELOAD,
         },
       },
@@ -400,7 +402,7 @@ function createMuseWindow() {
       nodeIntegration: false,
       sandbox: true,
       partition: "persist:muse",
-      // Academy build: feature preload (history + terminal skin).
+      // Academy build: feature preload (history + terminal bridge).
       preload: ACADEMY_PRELOAD,
     },
   });
@@ -492,7 +494,10 @@ function start() {
       // hidden when the owner clicked the Dock icon — the app read
       // as dead. Restore + focus the first window instead (the
       // standard macOS behavior the platform template encodes).
-      const first = windows[0];
+      // academy5: the Terminal window hides instead of closing, so
+      // it can be in this list while hidden — a Dock click restores
+      // the hosted window, never the terminal.
+      const first = windows.find((w) => !w.__academyTerminal) || windows[0];
       try {
         if (first.isMinimized()) first.restore();
         if (!first.isVisible()) first.show();

@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Muse (Academy Build) v0.4.0-academy3 verification.
+ * run-tests.cjs — Muse (Academy Build) v0.4.0-academy4 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -430,6 +430,23 @@ ok('academy state: markdownRoute round-trips; invalid values fall back to macdow
   assert.strictEqual(c.layer.getMarkdownRoute(), 'macdown', 'fresh install defaults to MacDown');
 });
 
+ok('md-t3: AcademyLSDefault helper source keeps its enum-only discipline', () => {
+  const src = fs.readFileSync(path.join(APP, '..', 'tools', 'AcademyLSDefault.m'), 'utf8');
+  assert.ok(/net\.daringfireball\.markdown/.test(src), 'the markdown UTI is the compiled-in constant');
+  assert.ok(/com\.detroitautomationacademy\.macdown/.test(src), 'the MacDown id is the compiled-in target');
+  assert.ok(!/@"public\.plain-text"|CFSTR\("public\.plain-text"\)/.test(src), 'plain text is never an operative literal (files/24 5b exclusion)');
+  const setCalls = src.match(/LSSetDefaultRoleHandlerForContentType/g) || [];
+  assert.strictEqual(setCalls.length, 2, 'exactly two set sites: set + restore');
+  assert.ok(!/NSTask|system\(|popen|NSWorkspace/.test(src), 'no process or workspace surface');
+  for (const verb of ['"get"', '"set"', '"restore"']) {
+    assert.ok(src.includes('isEqualToString:' + verb) || src.includes(verb), 'verb ' + verb + ' present');
+  }
+  const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
+  assert.ok(/academy-distro:\/\/app\/macdown/.test(main), 'fallback dialog deep-links to MacDown in Distro (DISTRO-DL1)');
+  assert.ok(/AcademyLSDefault/.test(main), 'main builds the lsDefault client');
+  assert.ok(/offerMarkdownDefault\(\)/.test(main), 'the first-route offer is wired');
+});
+
 // Async router groups: the router's decision tree under a fake env.
 function fakeRouteEnv(overrides = {}) {
   const calls = { openWithBundle: [], openSystemDefault: [], openDistro: 0, dialogs: [], bundleIdReads: [] };
@@ -582,7 +599,127 @@ async function markdownRouterGroups() {
   });
 }
 
+// MD-T3 groups: the consented system default under a fake
+// LaunchServices client + fake dialogs.
+function freshAcademy() {
+  const p = require.resolve(path.join(ELE, 'academy.cjs'));
+  delete require.cache[p];
+  return require(p);
+}
+
+function installAcademyT3({ stateObj, ls, dialogResponses }) {
+  const os = require('node:os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'academy-t3-'));
+  const stateFile = path.join(dir, 'academy-state.json');
+  if (stateObj) fs.writeFileSync(stateFile, JSON.stringify(stateObj));
+  const queue = (dialogResponses || []).slice();
+  const dialogs = [];
+  let template = null;
+  const academy = freshAcademy();
+  const ctx = {
+    app: { getPath: () => dir, getName: () => 'Muse', setAboutPanelOptions: () => {}, getVersion: () => '0.4.0' },
+    BrowserWindow: class {
+      static getAllWindows() { return []; }
+      static getFocusedWindow() { return null; }
+    },
+    Menu: {
+      buildFromTemplate: (t) => { template = t; return { items: [] }; },
+      setApplicationMenu: () => {},
+    },
+    dialog: {
+      showMessageBox: async (...args) => {
+        const opts = args[args.length - 1];
+        dialogs.push(opts);
+        return { response: queue.length ? queue.shift() : 0 };
+      },
+    },
+    ipcMain: { handle: () => {}, on: () => {}, removeListener: () => {} },
+    buildLabel: 'test',
+    lsDefault: ls,
+  };
+  const layer = academy.install(ctx);
+  return { layer, dir, stateFile, dialogs, template: () => template };
+}
+
+function fakeLs({ current }) {
+  const calls = [];
+  let cur = current;
+  const api = {
+    calls,
+    stateFile: null,
+    available: () => true,
+    getSync: () => cur,
+    set: async () => {
+      // Record-before-set proof: the predecessor must already be
+      // persisted in the state file when the set lands.
+      const saved = JSON.parse(fs.readFileSync(api.stateFile, 'utf8'));
+      calls.push(['set', saved.markdownDefaultPrevHandler]);
+      cur = 'com.detroitautomationacademy.macdown';
+      return true;
+    },
+    restore: async (id) => { calls.push(['restore', id]); cur = id; return true; },
+  };
+  return api;
+}
+
+async function markdownDefaultGroups() {
+  await okAsync('md-t3: offer Make Default records the predecessor BEFORE the set', async () => {
+    // The fake set reads the state file at call time: the
+    // predecessor must already be persisted when the set lands.
+    // installAcademyT3 writes no state until a save, so prime the
+    // state file path through a first install in the same dir is
+    // unnecessary — the fake resolves the file lazily instead.
+    const ls = fakeLs({ current: 'com.apple.TextEdit' });
+    const t = installAcademyT3({ stateObj: null, ls, dialogResponses: [0] });
+    ls.stateFile = t.stateFile;
+    await t.layer.offerMarkdownDefault();
+    assert.deepStrictEqual(ls.calls[0], ['set', 'com.apple.TextEdit'],
+      'set ran with the predecessor already recorded in state');
+    const saved = JSON.parse(fs.readFileSync(t.stateFile, 'utf8'));
+    assert.strictEqual(saved.markdownDefaultPrevHandler, 'com.apple.TextEdit');
+    assert.strictEqual(t.layer.getMarkdownDefaultState().isCurrent, true);
+    // Uncheck restores the recorded predecessor and clears it.
+    await t.layer.setMarkdownDefaultEnabled(false);
+    assert.deepStrictEqual(ls.calls[1], ['restore', 'com.apple.TextEdit']);
+    const saved2 = JSON.parse(fs.readFileSync(t.stateFile, 'utf8'));
+    assert.strictEqual(saved2.markdownDefaultPrevHandler, null);
+  });
+
+  await okAsync('md-t3: Never Ask persists; uncheck without a predecessor gives Finder guidance', async () => {
+    const ls = fakeLs({ current: 'com.apple.TextEdit' });
+    const t = installAcademyT3({ stateObj: null, ls, dialogResponses: [2] });
+    await t.layer.offerMarkdownDefault();
+    const saved = JSON.parse(fs.readFileSync(t.stateFile, 'utf8'));
+    assert.strictEqual(saved.markdownDefaultNeverAsk, true);
+    assert.strictEqual(ls.calls.length, 0, 'no LS change on Never Ask');
+    // A later session with neverAsk persisted: offer stays silent.
+    const t2 = installAcademyT3({ stateObj: saved, ls, dialogResponses: [0] });
+    await t2.layer.offerMarkdownDefault();
+    assert.strictEqual(t2.dialogs.length, 0, 'offer suppressed by persisted Never Ask');
+    // Uncheck with nothing recorded: guidance dialog, no restore.
+    await t2.layer.setMarkdownDefaultEnabled(false);
+    assert.strictEqual(ls.calls.length, 0);
+    const guidance = t2.dialogs[t2.dialogs.length - 1];
+    assert.ok(/Get Info/.test(guidance.detail), 'Finder Get Info guidance shown');
+  });
+
+  await okAsync('md-t3: menu checkbox reflects live LS state', async () => {
+    const lsIn = fakeLs({ current: 'com.detroitautomationacademy.macdown' });
+    const tIn = installAcademyT3({ stateObj: null, ls: lsIn, dialogResponses: [] });
+    const viewIn = tIn.template().find((i) => i.label === 'View');
+    const boxIn = viewIn.submenu.find((i) => i.label === 'Also Make MacDown the Default for Markdown Files');
+    assert.ok(boxIn, 'system-default checkbox present in the View menu');
+    assert.strictEqual(boxIn.checked, true, 'checked when MacDown is the live default');
+    const lsOut = fakeLs({ current: 'com.apple.TextEdit' });
+    const tOut = installAcademyT3({ stateObj: null, ls: lsOut, dialogResponses: [] });
+    const viewOut = tOut.template().find((i) => i.label === 'View');
+    const boxOut = viewOut.submenu.find((i) => i.label === 'Also Make MacDown the Default for Markdown Files');
+    assert.strictEqual(boxOut.checked, false, 'unchecked when another app is the live default');
+  });
+}
+
 markdownRouterGroups()
+  .then(markdownDefaultGroups)
   .then(() => {
     console.log('\nALL ' + passed + ' TEST GROUPS PASSED');
   })

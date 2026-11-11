@@ -18,19 +18,26 @@
  *     (Enter without Shift, or the composer's Send button). History
  *     is per conversation (URL path) and persisted by the main
  *     process in the app's own data directory.
- *  2. Terminal skin support: applies the `academy-terminal` class on
- *     <html> per the persisted preference and injects the skin
- *     stylesheet text served by the main process. The academy2
- *     sheet is whitelist-built (see terminal-skin.css): it can only
- *     style elements carrying a marker class, so this preload tags
- *     exactly three — the composer element (academy-composer), its
- *     shell (academy-composer-shell), and the message stream
- *     container (academy-stream, the scrollable region holding the
- *     conversation). Every skin rule also requires the html class,
- *     so toggling the class off restores the stock UI in full, in
- *     place, with no restart and no residue — the kill-switch is
- *     the class itself. Enter sends / Shift+Enter newline is the
- *     composer's own behavior and is not overridden.
+ *  2. Terminal bridge (0.4.0-academy5): the shell's Terminal
+ *     window is a front-end over THIS hosted session. On a
+ *     send-request from the main process, the message is driven
+ *     through the page's own composer (setText + the page's Send
+ *     button, Enter as fallback) — the page performs the real send
+ *     on the real authenticated session — and the reply is
+ *     observed from the message stream as it renders, reported
+ *     back as snapshot deltas (the full response text at ~250 ms
+ *     poll pace, not an API token stream). With no composer on the
+ *     page (signed out, still loading) the send is refused with
+ *     the reason; nothing is ever faked locally. The bridge also
+ *     answers history requests with this conversation's stored
+ *     history and reports composer presence as session state.
+ *     The terminal SKIN this bridge replaces was deleted in
+ *     academy5 (owner rejection, files/19 section 10): the marker
+ *     classes it needed (academy-composer / -shell / -stream) are
+ *     no longer tagged — the stream element is still tracked, as
+ *     the bridge's observation surface, but carries no class.
+ *     Enter sends / Shift+Enter newline is the composer's own
+ *     behavior and is not overridden.
  */
 
 var ipcRenderer = null;
@@ -249,8 +256,8 @@ function init() {
   // conversation. The composer may sit inside it or below it as a
   // sibling, so look in two places: the composer's own scrollable
   // ancestor chain, then the tallest scrollable element in the
-  // main landmark. Found or not, this only ever tags ONE element
-  // with a marker class — the skin styles nothing else.
+  // main landmark. The terminal bridge observes this element's
+  // rendered text to stream replies back to the Terminal window.
   function findStream() {
     try {
       var el = composer;
@@ -283,21 +290,12 @@ function init() {
 
   function trackComposer() {
     var found = findComposer();
-    if (found && found !== composer) {
-      if (composer && composer.classList) composer.classList.remove('academy-composer');
-      composer = found;
-      if (composer.classList) composer.classList.add('academy-composer');
-      var shell = composer.closest ? (composer.closest('form') || composer.parentElement) : null;
-      if (shell && shell.classList) shell.classList.add('academy-composer-shell');
-    }
+    if (found) composer = found;
     if (composer) {
       var stream = findStream();
-      if (stream !== streamEl) {
-        if (streamEl && streamEl.classList) streamEl.classList.remove('academy-stream');
-        streamEl = stream;
-        if (streamEl && streamEl.classList) streamEl.classList.add('academy-stream');
-      }
+      if (stream) streamEl = stream;
     }
+    reportHostState();
     return composer;
   }
   trackComposer();
@@ -362,28 +360,179 @@ function init() {
         key = conversationKey();
         navigator = createNavigator([]);
         composer = null;
+        hostState = null;
         refreshEntries();
         trackComposer();
       }
     } catch (error) { /* noop */ }
   }, 1000);
 
-  // Terminal skin: stylesheet once (rules are class-gated), class per
-  // the persisted preference, kept live via the apply broadcast.
-  function applySkin(on) {
+  // ---- Terminal bridge (0.4.0-academy5, files/19 section 10) ----
+  var hostState = null;
+  function reportHostState() {
+    var present = !!composer;
+    if (hostState === present) return;
+    hostState = present;
     try {
-      document.documentElement.classList.toggle('academy-terminal', !!on);
+      ipcRenderer.send('academy:terminal:event', { type: 'state', composer: present });
+    } catch (error) { /* best-effort */ }
+  }
+  window.setTimeout(reportHostState, 1500);
+
+  var termActive = null;
+  function streamText() {
+    var s = streamEl || findStream();
+    if (!s) return '';
+    try {
+      return s.innerText || s.textContent || '';
+    } catch (error) {
+      return '';
+    }
+  }
+  function responseText() {
+    var full = streamText();
+    if (!termActive) return '';
+    var base = termActive.baseline || '';
+    var out = full;
+    if (base && full.indexOf(base) === 0) out = full.slice(base.length);
+    out = out.replace(/^\s+/, '');
+    var sent = termActive.sentText || '';
+    if (sent && out.indexOf(sent) === 0) {
+      out = out.slice(sent.length).replace(/^\s+/, '');
+    }
+    return out;
+  }
+  function finishStream(note) {
+    if (!termActive) return;
+    var id = termActive.id;
+    var finalText = responseText();
+    if (termActive.timer) window.clearTimeout(termActive.timer);
+    termActive = null;
+    try {
+      ipcRenderer.send('academy:terminal:event', {
+        type: 'done', id: id, text: finalText, note: note || '',
+      });
     } catch (error) { /* noop */ }
   }
-  ipcRenderer.invoke('academy:skin:css').then(function (css) {
-    if (!css || document.getElementById('academy-terminal-style')) return;
-    var style = document.createElement('style');
-    style.id = 'academy-terminal-style';
-    style.textContent = css;
-    (document.head || document.documentElement).appendChild(style);
-  }).catch(function () { /* skin is optional */ });
-  ipcRenderer.invoke('academy:skin:get').then(applySkin).catch(function () { /* noop */ });
-  ipcRenderer.on('academy:skin:apply', function (_event, on) { applySkin(on); });
+  function pollStream() {
+    if (!termActive) return;
+    var now = Date.now();
+    var text = responseText();
+    if (text !== termActive.lastText) {
+      termActive.lastText = text;
+      termActive.lastChange = now;
+      try {
+        ipcRenderer.send('academy:terminal:event', {
+          type: 'delta', id: termActive.id, text: text,
+        });
+      } catch (error) { /* noop */ }
+    }
+    var capped = now - termActive.startedAt >= 180000;
+    var settled = now - termActive.lastChange >= 1600 &&
+      now - termActive.startedAt >= 1200 && !!termActive.lastText;
+    if (capped || settled) {
+      finishStream(capped ? 'time cap reached' : '');
+      return;
+    }
+    termActive.timer = window.setTimeout(pollStream, 250);
+  }
+  function findSendButton() {
+    var scopes = [];
+    try {
+      var form = composer && composer.closest ? composer.closest('form') : null;
+      if (form) scopes.push(form);
+    } catch (error) { /* noop */ }
+    scopes.push(document);
+    for (var s = 0; s < scopes.length; s++) {
+      var buttons = scopes[s].querySelectorAll('button, [role="button"]');
+      for (var i = 0; i < buttons.length; i++) {
+        var b = buttons[i];
+        var label = (b.getAttribute('aria-label') || b.getAttribute('title') || '').toLowerCase();
+        if (label.indexOf('send') === -1) continue;
+        if (b.disabled) continue;
+        var rect = b.getBoundingClientRect();
+        if (!rect || rect.width < 12 || rect.height < 12) continue;
+        return b;
+      }
+    }
+    return null;
+  }
+  function dispatchEnter(el) {
+    try {
+      var opts = {
+        key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+        bubbles: true, cancelable: true,
+      };
+      el.dispatchEvent(new window.KeyboardEvent('keydown', opts));
+      el.dispatchEvent(new window.KeyboardEvent('keyup', opts));
+    } catch (error) { /* noop */ }
+  }
+
+  ipcRenderer.on('academy:terminal:send-request', function (_event, payload) {
+    var id = payload && payload.id;
+    var text = payload && typeof payload.text === 'string' ? payload.text : '';
+    function reply(ok, error) {
+      try {
+        ipcRenderer.send('academy:terminal:send-reply', {
+          id: id, ok: ok, error: error || '',
+        });
+      } catch (e) { /* noop */ }
+    }
+    try {
+      var el = trackComposer();
+      if (!el) {
+        reply(false, 'No message box on the hosted page — sign in to Muse in the main window first.');
+        return;
+      }
+      if (termActive) finishStream('superseded by a newer send');
+      var baseline = streamText();
+      setText(el, text);
+      var button = findSendButton();
+      if (button) button.click();
+      else dispatchEnter(el);
+      termActive = {
+        id: id,
+        baseline: baseline,
+        sentText: text.trim(),
+        lastText: '',
+        lastChange: Date.now(),
+        startedAt: Date.now(),
+        timer: null,
+      };
+      termActive.timer = window.setTimeout(pollStream, 250);
+      window.setTimeout(function () {
+        // Verify the page actually took the send: the composer
+        // cleared, or the stream moved. Otherwise say so, plainly.
+        var stillThere = getText(el).trim() === text.trim();
+        var moved = streamText() !== baseline;
+        if (stillThere && !moved) {
+          if (termActive && termActive.id === id) {
+            if (termActive.timer) window.clearTimeout(termActive.timer);
+            termActive = null;
+          }
+          reply(false, 'The hosted page did not accept the message — the text is still sitting in its message box.');
+        } else {
+          reply(true, '');
+        }
+      }, 800);
+    } catch (error) {
+      reply(false, 'The terminal bridge hit an error driving the hosted page.');
+    }
+  });
+
+  ipcRenderer.on('academy:terminal:history-request', function (_event, payload) {
+    var id = payload && payload.id;
+    function answer(items) {
+      try {
+        ipcRenderer.send('academy:terminal:history-reply', {
+          id: id, key: key, items: items || [],
+        });
+      } catch (error) { /* noop */ }
+    }
+    ipcRenderer.invoke('academy:history:list', key)
+      .then(answer)
+      .catch(function () { answer([]); });
+  });
 }
 
 try {

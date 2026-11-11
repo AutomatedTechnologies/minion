@@ -1,12 +1,12 @@
 'use strict';
 /*
- * academy.cjs — Muse (Academy Build) v0.4.0-academy, main process.
+ * academy.cjs — Minion 0.4.1, main process.
  *
- * The Academy feature layer over the upstream muse-desktop shell:
+ * The Academy feature layer over the upstream shell:
  *  - Sent-message history (history.cjs): persisted per conversation
  *    in the app's own data directory (academy-state.json inside
  *    userData), served to the preload over IPC. IPC is accepted
- *    only from the muse.ai origin (utils.cjs isMuseOrigin).
+ *    only from the API endpoint origin (utils.cjs isEndpointOrigin).
  *  - Terminal view (0.4.0-academy5, Distro files/19 section 10):
  *    a first-class shell window (View menu, CmdOrCtrl+T) running
  *    terminal.html — the shell's own renderer surface, NOT CSS
@@ -55,7 +55,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { createHistoryStore } = require('./history.cjs');
-const { isMuseOrigin } = require('./utils.cjs');
+const { isEndpointOrigin } = require('./utils.cjs');
 const { MACDOWN_BUNDLE_ID } = require('./md-route.cjs');
 
 const STATE_FILE = 'academy-state.json';
@@ -78,7 +78,7 @@ function install(ctx) {
   let welcomeSeen = false;
   // Markdown routing preference (files/24 section 5a): where a
   // downloaded .md/.markdown opens. 'macdown' is the default —
-  // the owner's directive is the consent for Muse-internal
+  // the owner's directive is the consent for endpoint-internal
   // behavior. Finder and every other app are untouched by it.
   let markdownRoute = 'macdown';
   // Consented system default (files/24 section 5b, MD-T3): the
@@ -181,9 +181,9 @@ function install(ctx) {
   // a fresh profile is already dark.
   applyAppearance();
 
-  function senderIsMuse(event) {
+  function senderIsEndpoint(event) {
     try {
-      return isMuseOrigin(event.sender.getURL());
+      return isEndpointOrigin(event.sender.getURL());
     } catch (error) {
       return false;
     }
@@ -194,12 +194,12 @@ function install(ctx) {
   }
 
   ipcMain.handle('academy:history:list', (event, key) => {
-    if (!senderIsMuse(event) || !validKey(key)) return [];
+    if (!senderIsEndpoint(event) || !validKey(key)) return [];
     return store.list(key);
   });
 
   ipcMain.handle('academy:history:add', (event, key, text) => {
-    if (!senderIsMuse(event) || !validKey(key) || typeof text !== 'string') {
+    if (!senderIsEndpoint(event) || !validKey(key) || typeof text !== 'string') {
       return [];
     }
     const entries = store.add(key, text.slice(0, 20000));
@@ -235,7 +235,7 @@ function install(ctx) {
     try {
       for (const win of BrowserWindow.getAllWindows()) {
         if (win === terminalWindow) continue;
-        if (win.webContents && isMuseOrigin(win.webContents.getURL())) {
+        if (win.webContents && isEndpointOrigin(win.webContents.getURL())) {
           hostedWindow = win;
           break;
         }
@@ -264,7 +264,7 @@ function install(ctx) {
   // Hosted preload -> main: stream + state events, forwarded to
   // the terminal window. Only the hosted window's events count.
   ipcMain.on('academy:terminal:event', (event, payload) => {
-    if (!senderIsMuse(event) || !payload || typeof payload !== 'object') return;
+    if (!senderIsEndpoint(event) || !payload || typeof payload !== 'object') return;
     const host = findHostedWindow();
     if (host && event.sender !== host.webContents) return;
     if (payload.type === 'state') lastHostState = payload;
@@ -272,7 +272,7 @@ function install(ctx) {
   });
 
   ipcMain.on('academy:terminal:send-reply', (event, payload) => {
-    if (!senderIsMuse(event) || !payload || !pendingSends.has(payload.id)) return;
+    if (!senderIsEndpoint(event) || !payload || !pendingSends.has(payload.id)) return;
     const pending = pendingSends.get(payload.id);
     pendingSends.delete(payload.id);
     clearTimeout(pending.timer);
@@ -280,7 +280,7 @@ function install(ctx) {
   });
 
   ipcMain.on('academy:terminal:history-reply', (event, payload) => {
-    if (!senderIsMuse(event) || !payload || !pendingHistory.has(payload.id)) return;
+    if (!senderIsEndpoint(event) || !payload || !pendingHistory.has(payload.id)) return;
     const pending = pendingHistory.get(payload.id);
     pendingHistory.delete(payload.id);
     clearTimeout(pending.timer);
@@ -317,7 +317,7 @@ function install(ctx) {
     if (!host) {
       return {
         ok: false,
-        error: 'The Muse window is not open yet — open it, sign in, then send.',
+        error: 'The Minion window is not open yet — open it, sign in, then send.',
       };
     }
     termSendSeq += 1;
@@ -328,7 +328,7 @@ function install(ctx) {
       pendingSends, 12000,
       {
         id: id, ok: false,
-        error: 'The hosted page did not answer. Is the Muse window loaded and signed in?',
+        error: 'The hosted page did not answer. Is the Minion window loaded and signed in?',
       });
     if (reply && reply.ok) {
       // The terminal's own sends also land in the fallback history
@@ -336,7 +336,7 @@ function install(ctx) {
       // hosted conversation's history cannot be read back. (The
       // hosted preload separately records the send into the
       // conversation's own history when the page sends it.)
-      store.add('muse:terminal', text.trim().slice(0, 20000));
+      store.add('minion:terminal', text.trim().slice(0, 20000));
       saveState();
     }
     return reply && typeof reply.ok === 'boolean'
@@ -353,7 +353,7 @@ function install(ctx) {
       { id: id },
       pendingHistory, 3000, null);
     if (reply && Array.isArray(reply.items)) return reply.items;
-    return store.list('muse:terminal');
+    return store.list('minion:terminal');
   });
 
   ipcMain.handle('academy:terminal:info', (event) => {
@@ -464,7 +464,7 @@ function install(ctx) {
       if (!ok) {
         await infoDialog(
           'Couldn’t make MacDown the default',
-          'LaunchServices did not accept the change. Markdown files you download in Muse still open in MacDown; only the system-wide default is unchanged.');
+          'LaunchServices did not accept the change. Markdown files you download in Minion still open in MacDown; only the system-wide default is unchanged.');
       }
     } else {
       const prev = markdownDefaultPrevHandler;
@@ -502,7 +502,7 @@ function install(ctx) {
       type: 'question',
       title: 'Make MacDown the default for markdown files?',
       message: 'Make MacDown the default for markdown files?',
-      detail: 'MacDown already opens the markdown files you download in Muse. You can also make it the default app for markdown files everywhere on this Mac, Finder included. This changes only markdown files — plain text files are not affected. You can undo it any time in the View menu.',
+      detail: 'MacDown already opens the markdown files you download in Minion. You can also make it the default app for markdown files everywhere on this Mac, Finder included. This changes only markdown files — plain text files are not affected. You can undo it any time in the View menu.',
       buttons: ['Make Default', 'Not Now', 'Never Ask'],
       defaultId: 0,
       cancelId: 1,
@@ -754,7 +754,7 @@ function install(ctx) {
             enabled: false,
           },
           {
-            label: 'Built from muse-desktop (MIT) on Electron 22.3.27',
+            label: 'Built by the Detroit Automation Academy on Electron 22.3.27',
             enabled: false,
           },
         ],
@@ -767,11 +767,12 @@ function install(ctx) {
 
   app.setAboutPanelOptions({
     applicationName: 'Minion',
-    applicationVersion: ctx.buildLabel || '0.4.0-minion3',
-    version: '0.4.0',
+    applicationVersion: ctx.buildLabel || '0.4.1',
+    version: '0.4.1',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +
-      'muse-desktop is MIT, (c) Benjamin Kitt and Muse Desktop contributors. ' +
+      'The application layer is MIT-licensed open source; the license ' +
+      'and attribution are in the LICENSE file inside the app bundle. ' +
       'Academy build by the Detroit Automation Academy.',
   });
 

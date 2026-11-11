@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble Muse-Academy-1013-x64.zip — Minion 0.4.0-minion3.
+"""Assemble Minion-1013-x64.zip — Minion 0.4.1.
 
 Construction of record (Distro files/06): the official Electron
 v22.3.27 darwin-x64 distribution (SHA-256 pinned below — a mismatch
@@ -8,7 +8,7 @@ halts the build), plus the sanctioned changed set:
   1. Electron.app renamed to Minion.app; MacOS/Electron -> MacOS/Minion
      (bytes identical).
   2. Stock electron.icns removed; Academy icon.icns added (assets/).
-  3. Contents/Resources/app/ added from app/ (upstream muse-desktop
+  3. Contents/Resources/app/ added from app/ (upstream
      v0.3.0 source + the Academy feature layer).
   4. Info.plist merged from the dist template: the 7 identity keys
      of files/06 section 5, versions 0.4.0, and the Academy audit
@@ -35,7 +35,7 @@ import tempfile
 import zipfile
 
 DIST_SHA256 = "01f053d08cb2855acb14f0465f4e36324a41bd13b3b2ead142970a56df3e9db1"
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 AUDIT = {
     "Disassembled": True,
     "Scanned": True,
@@ -207,7 +207,7 @@ def main():
         print(f"FATAL: dist SHA-256 {digest} != pinned {DIST_SHA256}", file=sys.stderr)
         return 1
 
-    work = tempfile.mkdtemp(prefix="muse-academy-assemble-", dir=args.workdir)
+    work = tempfile.mkdtemp(prefix="minion-assemble-", dir=args.workdir)
     try:
         extract_preserving(args.dist, work)
         src_app = os.path.join(work, "Electron.app")
@@ -243,15 +243,13 @@ def main():
         plist["CFBundleDisplayName"] = "Minion"
         plist["CFBundleExecutable"] = "Minion"
         plist["CFBundleIconFile"] = "icon.icns"
-        # minion1: the app is Minion. academy5 first carried the
-        # Academy bundle identity after the owner revoked the
-        # ai.muse.desktop carve-out 2026-11-10 21:14 EST ("nothing
-        # hits Distro without a disassembly and rebuild"); the
-        # owner then renamed the app itself (2026-11-10 21:49 EST:
-        # "rename academy muse to minion"), so this build — the
-        # line's own disassembly/scan/rebuild (files/19 sections
-        # 2-11) — ships as Minion under
-        # com.detroitautomationacademy.minion.
+        # The app is Minion under the Academy bundle identity
+        # com.detroitautomationacademy.minion (owner directives
+        # 2026-11-10 21:14 + 21:49 EST; obliteration ruling
+        # 2026-11-11 13:14 EST, Distro files/19 sections 10-11
+        # and 16): this build — the line's own
+        # disassembly/scan/rebuild — ships as Minion, identified
+        # by version alone (0.4.1).
         plist["CFBundleIdentifier"] = "com.detroitautomationacademy.minion"
         plist["CFBundleName"] = "Minion"
         plist["CFBundleShortVersionString"] = VERSION

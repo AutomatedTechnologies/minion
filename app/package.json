@@ -1,9 +1,9 @@
 {
-  "name": "muse-desktop",
-  "version": "0.4.0",
+  "name": "minion",
+  "version": "0.4.1",
   "private": true,
   "license": "MIT",
-  "description": "A cross-platform desktop client for Meta Muse",
+  "description": "Minion \u2014 the Detroit Automation Academy's desktop client for macOS High Sierra",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "electron .",
@@ -18,7 +18,7 @@
   "build": {
     "appId": "com.detroitautomationacademy.minion",
     "productName": "Minion",
-    "artifactName": "Muse-${version}-${os}-${arch}.${ext}",
+    "artifactName": "Minion-${version}-${os}-${arch}.${ext}",
     "files": [
       "electron/**/*",
       "package.json"
@@ -31,8 +31,8 @@
         "deb",
         "rpm"
       ],
-      "synopsis": "Desktop client for Meta Muse",
-      "maintainer": "Muse Desktop contributors <muse-desktop@localhost>",
+      "synopsis": "Minion desktop client",
+      "maintainer": "Detroit Automation Academy",
       "syncDesktopName": true
     },
     "win": {
@@ -51,7 +51,7 @@
     },
     "icon": "build/icon.png"
   },
-  "author": "Muse Desktop contributors <muse-desktop@localhost>",
-  "homepage": "https://muse.ai",
-  "desktopName": "muse-desktop"
+  "author": "Detroit Automation Academy",
+  "homepage": "https://detroitautomationacademy.com",
+  "desktopName": "minion"
 }

@@ -1,6 +1,6 @@
 //
 //  AcademyLSDefault.m
-//  Muse (Academy Build) — LaunchServices default-handler helper
+//  Minion — LaunchServices default-handler helper
 //  (Distro files/24 section 5b, tranche MD-T3).
 //
 //  The whole surface is three verbs and nothing else:

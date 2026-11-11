@@ -75,7 +75,7 @@
 </head>
 <body>
   <div id="bar">
-    <span class="title">MUSE — TERMINAL</span>
+    <span class="title">MINION — TERMINAL</span>
     <span id="state">session: connecting…</span>
   </div>
   <div id="scrollback"></div>
@@ -117,15 +117,15 @@
   }
   function setState(composer) {
     stateEl.textContent = composer
-      ? 'session: live — hosted Muse window'
-      : 'session: no message box — sign in via the main Muse window';
+      ? 'session: live — hosted Minion window'
+      : 'session: no message box — sign in via the main Minion window';
   }
 
   print('Minion — terminal', 'sys');
   if (bridge && bridge.info) {
     bridge.info().then(function (info) {
       if (info && info.build) {
-        print('build ' + info.build + ' · a terminal front-end over the live hosted Muse session in the main window', 'sys');
+        print('build ' + info.build + ' · a terminal front-end over the live hosted Minion session in the main window', 'sys');
       }
       print('Type a message and press Enter. /help lists the local commands.', 'sys');
     }).catch(function () { /* banner stands without it */ });
@@ -168,7 +168,7 @@
   function showHelp() {
     print('/help   this list', 'sys');
     print('/clear  clear the scrollback', 'sys');
-    print('/view   back to the hosted Muse window', 'sys');
+    print('/view   back to the hosted Minion window', 'sys');
     print('Anything else is a message to Minion, sent through the hosted session.', 'sys');
   }
 

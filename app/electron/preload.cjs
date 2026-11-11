@@ -1,8 +1,8 @@
 'use strict';
 /*
- * preload.cjs — Muse (Academy Build) v0.4.0-academy.
+ * preload.cjs — Minion 0.4.1.
  *
- * Injected into the hosted muse.ai pages (main window + popups) by
+ * Injected into the hosted pages (main window + popups) by
  * the patched main.cjs. Sandboxed: the only module available is
  * `electron` (ipcRenderer). Everything here is defensive — a failure
  * in this file must never break the hosted page; every entry point
@@ -103,9 +103,9 @@ function createNavigator(entries) {
 
 function conversationKey() {
   try {
-    return 'muse:' + window.location.pathname;
+    return 'minion:' + window.location.pathname;
   } catch (error) {
-    return 'muse:/';
+    return 'minion:/';
   }
 }
 
@@ -481,7 +481,7 @@ function init() {
     try {
       var el = trackComposer();
       if (!el) {
-        reply(false, 'No message box on the hosted page — sign in to Muse in the main window first.');
+        reply(false, 'No message box on the hosted page — sign in to Minion in the main window first.');
         return;
       }
       if (termActive) finishStream('superseded by a newer send');

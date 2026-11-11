@@ -1,25 +1,32 @@
-# Muse (Academy Build)
+# Minion
 
-An unofficial build of the open-source **muse-desktop** client
-(MIT — github.com/benjaminkitt/muse-desktop, v0.3.0) rebuilt on
-**Electron 22.3.27**, the last Electron line that runs on
-**macOS High Sierra (10.13)**, for Intel Macs. The official Muse app
-requires Apple Silicon and a current macOS; this build exists so the
-Academy's High Sierra machines can run a Muse client at all.
+**Minion** is the Detroit Automation Academy's desktop client for
+Intel Macs running **macOS High Sierra (10.13)**, assembled on
+**Electron 22.3.27** — the last Electron line that runs on 10.13.
+The hosted service's official app requires Apple Silicon and a
+current macOS; Minion exists so the Academy's High Sierra machines
+can run a client at all. The app connects to its API endpoint over
+HTTPS; the endpoint is plumbing, never a name — every surface of
+this app is Minion.
 
 Packaged by **Detroit Automation Academy** for distribution through
-**Distro**, the Academy's High Sierra app store. The application icon
-in this packaging is the Academy monochrome standard rendition
-(ink on paper). Nothing else in the application is changed.
+**Distro**, the Academy's High Sierra app store.
 
-- Bundle: `Muse.app` — bundle id `ai.muse.desktop`, version 0.3.0
-- Unsigned test build (no Apple Developer identity) — first launch on
-  the Mac requires right-click → Open.
-- Not a Meta product. Not endorsed by Meta. "Muse" is Meta's product
-  name, used here only to identify what this client connects to.
-- Runtime status at packaging: assembled and bundle-verified;
-  launch on real 10.13 hardware is the owner's verification gate.
-
-Upstream source: https://github.com/benjaminkitt/muse-desktop
-(commit c85467b, v0.3.0; sole adaptation: `app.setDesktopName` guard
-for Electron 22).
+- Bundle: `Minion.app` — bundle id
+  `com.detroitautomationacademy.minion`, version **0.4.1**,
+  identified by version alone.
+- Icon: the Minion mark (the scheming side-eye dog) in the Academy
+  monochrome standard rendition — white tile, ink artwork, no
+  black field.
+- Unsigned test build (no Apple Developer identity) — first launch
+  on the Mac requires right-click → Open.
+- Not a Meta product. Not endorsed by Meta.
+- Application layer: open-source (MIT, v0.3.0) plus the Academy
+  feature layer — see `app/LICENSE` for the license and
+  attribution, and `LICENSE-ACADEMY.md` for the Academy License
+  governing Academy-original works.
+- Data: stored separately, outside the bundle, at
+  `~/Library/Application Support/com.detroitautomationacademy.minion`.
+- Runtime status at packaging: assembled and bundle-verified in
+  CI; launch on real 10.13 hardware is the owner's verification
+  gate.

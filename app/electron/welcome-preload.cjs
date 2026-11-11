@@ -1,6 +1,6 @@
 'use strict';
 /*
- * welcome-preload.cjs — Muse (Academy Build) v0.4.0-academy.
+ * welcome-preload.cjs — Minion 0.4.1.
  * The whole bridge for the SDS-8 welcome window: one signal, the
  * owner's Continue. Nothing else is exposed to the welcome page.
  */

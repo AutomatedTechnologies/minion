@@ -1,6 +1,6 @@
 'use strict';
 /*
- * history.cjs — Muse (Academy Build) v0.4.0-academy, main process.
+ * history.cjs — Minion 0.4.1, main process.
  *
  * Sent-message history for the composer: shell-style up-arrow recall,
  * persisted per conversation in the app's own data directory.

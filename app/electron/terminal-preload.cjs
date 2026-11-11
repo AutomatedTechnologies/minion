@@ -1,6 +1,6 @@
 'use strict';
 /*
- * terminal-preload.cjs — Muse (Academy Build) 0.4.0-academy5.
+ * terminal-preload.cjs — Minion 0.4.1.
  * The whole bridge for the shell's Terminal window (terminal.html):
  * send a message to the hosted session, read back the shared
  * history, ask for the build identity, jump back to the hosted

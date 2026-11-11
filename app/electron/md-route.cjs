@@ -1,6 +1,6 @@
 'use strict';
 /*
- * md-route.cjs — Muse (Academy Build), main process.
+ * md-route.cjs — Minion, main process.
  *
  * The markdown router (design record: Distro files/24). When a
  * download completes in the shell and the classifier

@@ -1,6 +1,6 @@
 'use strict';
 /*
- * window-state.cjs — Muse (Academy Build) v0.4.0-academy.
+ * window-state.cjs — Minion 0.4.1.
  *
  * Pure geometry for the window-management repair (owner escalation
  * 2026-11-10; defect register in files/19). No Electron imports —

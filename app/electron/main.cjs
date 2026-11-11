@@ -4,14 +4,14 @@ const fs = require("node:fs");
 const os = require("node:os");
 const { execFile, execFileSync } = require("node:child_process");
 
-const MUSE_URL = "https://muse.ai/";
+const API_ENDPOINT = "https://muse.ai/";
 const {
   isTrustedNavigation,
   isAllowedExternalUrl,
-  isMuseOrigin,
+  isEndpointOrigin,
   uniqueDownloadPath,
 } = require("./utils.cjs");
-// Academy build (v0.4.0-academy): feature layer + window-management
+// Minion 0.4.1: feature layer + window-management
 // repair (owner escalation 2026-11-10; defect register in files/19).
 // academy.cjs: sent-message history, terminal view (academy5; the
 // terminal skin it replaced is deleted), SDS-8 welcome, application
@@ -36,7 +36,7 @@ const {
   placementFor,
 } = require("./window-state.cjs");
 
-const ACADEMY_BUILD_LABEL = "0.4.0-minion3";
+const ACADEMY_BUILD_LABEL = "0.4.1";
 const ACADEMY_PRELOAD = path.join(__dirname, "preload.cjs");
 
 // Set by start() once the feature layer is installed; window
@@ -240,7 +240,7 @@ function configureSession(ses) {
   ses.setPermissionCheckHandler(
     (_webContents, permission, requestingOrigin) => {
       return (
-        allowedPermissions.has(permission) && isMuseOrigin(requestingOrigin)
+        allowedPermissions.has(permission) && isEndpointOrigin(requestingOrigin)
       );
     },
   );
@@ -249,7 +249,7 @@ function configureSession(ses) {
     (_webContents, permission, callback, details) => {
       const requestingUrl = details?.requestingUrl ?? "";
       callback(
-        allowedPermissions.has(permission) && isMuseOrigin(requestingUrl),
+        allowedPermissions.has(permission) && isEndpointOrigin(requestingUrl),
       );
     },
   );
@@ -343,9 +343,9 @@ function configureWindowNavigation(window, isPopup = false) {
           nodeIntegrationInSubFrames: false,
           sandbox: true,
           webSecurity: true,
-          partition: "persist:muse",
+          partition: "persist:minion",
           // Academy build: the feature preload (history + terminal
-          // bridge) applies to popup windows on the muse.ai origin
+          // bridge) applies to popup windows on the API endpoint origin
           // too.
           preload: ACADEMY_PRELOAD,
         },
@@ -381,7 +381,7 @@ function configureWindowNavigation(window, isPopup = false) {
   contents.on("will-redirect", guardNavigation);
 }
 
-function createMuseWindow() {
+function createMinionWindow() {
   // WindowLaw placement (see mainWindowPlacement): upstream created
   // this window with a size and NO position and no clamp — on the
   // Air's 1280-1440px displays the OS cascade could and did park
@@ -401,7 +401,7 @@ function createMuseWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      partition: "persist:muse",
+      partition: "persist:minion",
       // Academy build: feature preload (history + terminal bridge).
       preload: ACADEMY_PRELOAD,
     },
@@ -419,8 +419,8 @@ function createMuseWindow() {
   // title is app chrome and reads "Minion". The BrowserWindow
   // option above names it, but a loaded page replaces the window
   // title with its own <title> on every navigation unless the
-  // update is refused — muse.ai's page title is "Muse", the
-  // service's name for its page, and the owner's Air screenshot
+  // update is refused — the hosted page's title names the
+  // service, not this app, and the owner's Air screenshot
   // showed exactly that standing in the title bar over the
   // "Minion" app menu. Refuse the page's title updates and
   // restate the app's name. Only the hosted window is pinned:
@@ -438,10 +438,10 @@ function createMuseWindow() {
   window.once("ready-to-show", () => {
     if (!window.isDestroyed()) window.show();
   });
-  async function loadMuse() {
+  async function loadMinion() {
     while (!window.isDestroyed()) {
       try {
-        await window.loadURL(MUSE_URL);
+        await window.loadURL(API_ENDPOINT);
         return;
       } catch {
         if (window.isDestroyed()) return;
@@ -449,8 +449,8 @@ function createMuseWindow() {
         window.show();
         const { response } = await dialog.showMessageBox(window, {
           type: "error",
-          title: "Could not load Muse",
-          message: "Muse could not be reached.",
+          title: "Could not load Minion",
+          message: "Minion could not be reached.",
           detail: "Check your internet connection, then try again.",
           buttons: ["Retry", "Close"],
           defaultId: 0,
@@ -464,8 +464,8 @@ function createMuseWindow() {
       }
     }
   }
-  void loadMuse().catch(() =>
-    console.warn("Could not show Muse load recovery"),
+  void loadMinion().catch(() =>
+    console.warn("Could not show Minion load recovery"),
   );
   return window;
 }
@@ -475,11 +475,11 @@ function start() {
   academy.earlyInit(app);
 
   // Align the running window with the installed Linux desktop entry so desktop
-  // shells (GNOME, KDE) resolve the muse-desktop icon via WM_CLASS/app_id.
+  // shells (GNOME, KDE) resolve the Minion icon via WM_CLASS/app_id.
   // app.setDesktopName was added in Electron 24; on Electron 22 (the last
   // line that runs on macOS 10.13) skip it instead of throwing at startup.
   if (process.platform === "linux" && typeof app.setDesktopName === "function") {
-    app.setDesktopName("muse-desktop.desktop");
+    app.setDesktopName("minion.desktop");
   }
 
   // App data stored separately (owner coding standard, J dir
@@ -487,15 +487,12 @@ function start() {
   // bundle, in its own Application Support location keyed to the
   // bundle identity — ~/Library/Application Support/
   // com.detroitautomationacademy.minion. Nothing user-data is
-  // kept inside the .app. The previous version (Muse (Academy
-  // Build), the declared predecessor) pinned its data to
-  // ~/Library/Application Support/Muse; that store stays
-  // untouched under its own location, and removing either
-  // version's bundle never touches either data store.
+  // kept inside the .app, and removing the bundle never
+  // touches the data store.
   app.setPath("userData", path.join(app.getPath("appData"), "com.detroitautomationacademy.minion"));
 
   app.whenReady().then(() => {
-    configureSession(session.fromPartition("persist:muse"));
+    configureSession(session.fromPartition("persist:minion"));
     // Academy build: install the feature layer, then the SDS-8
     // welcome gate decides whether the service window opens now or
     // after the owner's Continue (first launch only).
@@ -510,11 +507,11 @@ function start() {
       lsDefault: createLsDefaultClient(),
     });
     installMarkdownRouter();
-    academyLayer.gateWelcome(createMuseWindow);
+    academyLayer.gateWelcome(createMinionWindow);
     app.on("activate", () => {
       const windows = BrowserWindow.getAllWindows();
       if (windows.length === 0) {
-        academyLayer.gateWelcome(createMuseWindow);
+        academyLayer.gateWelcome(createMinionWindow);
         return;
       }
       // Upstream's handler did nothing when a window existed: a

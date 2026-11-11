@@ -31,7 +31,7 @@ function isAllowedExternalUrl(rawUrl) {
   }
 }
 
-function isMuseOrigin(rawUrl) {
+function isEndpointOrigin(rawUrl) {
   try {
     return new URL(rawUrl).origin === "https://muse.ai";
   } catch {
@@ -41,7 +41,7 @@ function isMuseOrigin(rawUrl) {
 
 // Reserve the destination atomically, including against other processes.
 function uniqueDownloadPath(downloadsDir, filename) {
-  const safeName = path.basename(filename) || "muse-download";
+  const safeName = path.basename(filename) || "minion-download";
   const parsed = path.parse(safeName);
   let candidate = path.join(downloadsDir, safeName);
   let suffix = 1;
@@ -65,6 +65,6 @@ function uniqueDownloadPath(downloadsDir, filename) {
 module.exports = {
   isTrustedNavigation,
   isAllowedExternalUrl,
-  isMuseOrigin,
+  isEndpointOrigin,
   uniqueDownloadPath,
 };

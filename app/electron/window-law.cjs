@@ -1,6 +1,6 @@
 'use strict';
 /*
- * WindowLaw — Muse (Academy Build) v0.4.0-academy, main process.
+ * WindowLaw — Minion 0.4.1, main process.
  * Fixes P1 (originating defect, 2026-11-08): browser windows stacking
  * partially off-screen and overlapping the active window.
  *

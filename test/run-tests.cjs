@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Minion v0.4.0-minion3 verification.
+ * run-tests.cjs — Minion 0.4.1 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -257,7 +257,7 @@ ok('academy5: the terminal skin is deleted, not disabled', () => {
   assert.ok(/terminal-preload\.cjs/.test(expectedBlock[1]), 'terminal preload expected in the artifact');
 });
 
-ok('minion3: bundle identity is the Academy identifier', () => {
+ok('0.4.1: bundle identity is the Academy identifier', () => {
   // Owner revocation 2026-11-10 21:14 EST: the ai.muse.desktop
   // carve-out is gone; the line ships under its Academy identity.
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
@@ -281,7 +281,7 @@ ok('minion3: bundle identity is the Academy identifier', () => {
   }
 });
 
-ok('minion3: the app is named Minion on every shipped surface', () => {
+ok('0.4.1: the app is named Minion on every shipped surface', () => {
   // Owner rename 2026-11-10 21:49 EST: "rename academy muse to
   // minion." The bundle, the windows, the menu, the welcome and the
   // terminal all carry the one name; the upstream identity survives
@@ -316,7 +316,7 @@ ok('minion3: the app is named Minion on every shipped surface', () => {
     'assembler stamps the Minion executable');
 });
 
-ok('minion3: app data stored separately, keyed to the bundle identity', () => {
+ok('0.4.1: app data stored separately, keyed to the bundle identity', () => {
   // Owner coding standard (J dir 2026-11-10 22:18 EST): the
   // app's data lives outside the bundle, in its own Application
   // Support location keyed to the bundle ID. Minion's store is
@@ -389,7 +389,7 @@ ok('academy5: terminal page is a self-contained shell surface', () => {
 
 ok('academy5: terminal wiring across main, academy, preload', () => {
   const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
-  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.0-minion3"/.test(main), 'build label is minion3');
+  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.1"/.test(main), 'build label is 0.4.1');
   assert.ok(/__academyTerminal/.test(main), 'activate handler can tell the terminal window apart');
   const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
   assert.ok(/label: 'Terminal'/.test(academy), 'View menu carries the Terminal item');
@@ -458,7 +458,7 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
   assert.ok(/preload: ACADEMY_PRELOAD/.test(main), 'main window carries the preload');
   assert.ok(/preload: ACADEMY_PRELOAD,/.test(main.replace(/\s+/g, ' ')) || /preload: ACADEMY_PRELOAD/.test(main), 'popup carries the preload');
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
-  assert.strictEqual(pkg.version, '0.4.0');
+  assert.strictEqual(pkg.version, '0.4.1');
   assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.minion');
 });
 
@@ -897,7 +897,7 @@ async function terminalBehaviorGroups() {
         removeListener: () => {},
       },
       nativeTheme: { themeSource: 'system' },
-      buildLabel: '0.4.0-minion3',
+      buildLabel: '0.4.1',
     };
     const layer = academy.install(ctx);
 
@@ -973,13 +973,13 @@ async function terminalBehaviorGroups() {
     // and the history relay round-trips the hosted conversation's
     // entries; a non-terminal caller gets nothing.
     const saved = JSON.parse(fs.readFileSync(path.join(dir, 'academy-state.json'), 'utf8'));
-    assert.deepStrictEqual(saved.history.conversations['muse:terminal'].entries, ['hello']);
+    assert.deepStrictEqual(saved.history.conversations['minion:terminal'].entries, ['hello']);
     assert.deepStrictEqual(await history({ sender: hostWin.webContents }), []);
     const pendingHistory = history({ sender: termWin.webContents });
     const hreq = hostWin.webContents.sent.find((s) => s[0] === 'academy:terminal:history-request');
     assert.ok(hreq, 'history-request relayed to the hosted window');
     listeners.get('academy:terminal:history-reply')(
-      { sender: hostWin.webContents }, { id: hreq[1].id, key: 'muse:/chat/1', items: ['older', 'hello'] });
+      { sender: hostWin.webContents }, { id: hreq[1].id, key: 'minion:/chat/1', items: ['older', 'hello'] });
     assert.deepStrictEqual(await pendingHistory, ['older', 'hello']);
 
     // minion3 appearance, the other launch: a profile whose state
@@ -1002,7 +1002,7 @@ async function terminalBehaviorGroups() {
         handle: () => {}, on: () => {}, removeListener: () => {},
       },
       nativeTheme: { themeSource: 'system' },
-      buildLabel: '0.4.0-minion3',
+      buildLabel: '0.4.1',
     };
     const layer2 = academy2.install(ctx2);
     assert.strictEqual(ctx2.nativeTheme.themeSource, 'light',
@@ -1011,7 +1011,7 @@ async function terminalBehaviorGroups() {
 
     // Build info is the runtime plist version for the terminal only.
     assert.deepStrictEqual(await info({ sender: termWin.webContents }),
-      { name: 'Minion', version: '0.4.0', build: '0.4.0-minion3' });
+      { name: 'Minion', version: '0.4.0', build: '0.4.1' });
     assert.strictEqual(await info({ sender: hostWin.webContents }), null);
   });
 }
@@ -1020,7 +1020,28 @@ markdownRouterGroups()
   .then(markdownDefaultGroups)
   .then(terminalBehaviorGroups)
   .then(() => {
-    console.log('\nALL ' + passed + ' TEST GROUPS PASSED');
+    ok('0.4.1: obliteration census — no muse naming survives in the shipped layer', () => {
+  // Owner ruling 2026-11-11 13:14 EST: a rename is total. Every
+  // line in the shipped Academy layer that still matches /muse/i
+  // must be an API endpoint constant (the muse.ai address the app
+  // calls — plumbing, never a name, brand, or display element).
+  const shipped = [];
+  for (const f of fs.readdirSync(ELE)) shipped.push(path.join(ELE, f));
+  shipped.push(path.join(APP, 'package.json'));
+  shipped.push(path.join(APP, '..', 'assets', 'INSTALL.txt'));
+  shipped.push(path.join(APP, '..', 'tools', 'assemble.py'));
+  for (const f of shipped) {
+    const lines = fs.readFileSync(f, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+      if (/muse/i.test(line)) {
+        assert.ok(/muse\.ai/.test(line),
+          'non-endpoint muse naming survives at ' + path.basename(f) + ':' + (i + 1) + ': ' + line.trim());
+      }
+    });
+  }
+});
+
+console.log('\nALL ' + passed + ' TEST GROUPS PASSED');
   })
   .catch((error) => {
     console.error(error);

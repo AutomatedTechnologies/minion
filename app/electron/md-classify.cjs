@@ -1,6 +1,6 @@
 'use strict';
 /*
- * md-classify.cjs — Muse (Academy Build), main process.
+ * md-classify.cjs — Minion, main process.
  *
  * Pure classification for markdown routing (design record:
  * Distro files/24 — markdown encountered in the Academy Build

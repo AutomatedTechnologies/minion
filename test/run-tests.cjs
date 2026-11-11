@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Muse (Academy Build) v0.4.0-academy5 verification.
+ * run-tests.cjs — Minion v0.4.0-minion1 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -253,13 +253,13 @@ ok('academy5: the terminal skin is deleted, not disabled', () => {
   assert.ok(/terminal-preload\.cjs/.test(expectedBlock[1]), 'terminal preload expected in the artifact');
 });
 
-ok('academy5: bundle identity is the Academy identifier', () => {
+ok('minion1: bundle identity is the Academy identifier', () => {
   // Owner revocation 2026-11-10 21:14 EST: the ai.muse.desktop
   // carve-out is gone; the line ships under its Academy identity.
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
-  assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.muse');
+  assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.minion');
   const assemble = fs.readFileSync(path.join(APP, '..', 'tools', 'assemble.py'), 'utf8');
-  assert.ok(/plist\["CFBundleIdentifier"\] = "com\.detroitautomationacademy\.muse"/.test(assemble),
+  assert.ok(/plist\["CFBundleIdentifier"\] = "com\.detroitautomationacademy\.minion"/.test(assemble),
     'assembler stamps the Academy bundle id');
   // The old identifier survives in no functional code: not in any
   // shipped script or the package manifest. (Prose records — the
@@ -272,7 +272,37 @@ ok('academy5: bundle identity is the Academy identifier', () => {
   for (const f of codeFiles) {
     const text = fs.readFileSync(path.join(ELE, f), 'utf8');
     assert.ok(!/ai\.muse\.desktop/.test(text), 'old bundle id survives in ' + f);
+    assert.ok(!/com\.detroitautomationacademy\.muse(?![a-z])/.test(text),
+      'superseded academy5 bundle id survives in ' + f);
   }
+});
+
+ok('minion1: the app is named Minion on every shipped surface', () => {
+  // Owner rename 2026-11-10 21:49 EST: "rename academy muse to
+  // minion." The bundle, the windows, the menu, the welcome and the
+  // terminal all carry the one name; the upstream identity survives
+  // only as provenance (the muse.ai session, the muse-desktop
+  // credit), never as the product name.
+  const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
+  assert.ok(/label: 'About Minion'/.test(academy), 'About item is Minion');
+  assert.ok(/title: 'Welcome — Minion'/.test(academy), 'welcome window titled Minion');
+  assert.ok(/title: 'Terminal — Minion'/.test(academy), 'terminal window titled Minion');
+  assert.ok(!/'Muse \(Academy Build\)'/.test(academy),
+    'old product name survives in the main layer');
+  const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
+  assert.ok(/title: "Minion"/.test(main), 'hosted window titled Minion');
+  const welcome = fs.readFileSync(path.join(ELE, 'welcome.html'), 'utf8');
+  assert.ok(/<h1>Welcome to Minion<\/h1>/.test(welcome), 'welcome headline is Minion');
+  assert.ok(!/Terminal Skin/.test(welcome),
+    'welcome no longer advertises the deleted skin');
+  const terminal = fs.readFileSync(path.join(ELE, 'terminal.html'), 'utf8');
+  assert.ok(/<title>Terminal — Minion<\/title>/.test(terminal), 'terminal page titled Minion');
+  const assemble = fs.readFileSync(path.join(APP, '..', 'tools', 'assemble.py'), 'utf8');
+  assert.ok(/"Minion\.app"/.test(assemble), 'assembler builds Minion.app');
+  assert.ok(/plist\["CFBundleName"\] = "Minion"/.test(assemble),
+    'assembler stamps the Minion bundle name');
+  assert.ok(/plist\["CFBundleExecutable"\] = "Minion"/.test(assemble),
+    'assembler stamps the Minion executable');
 });
 
 ok('academy5: terminal page is a self-contained shell surface', () => {
@@ -296,7 +326,7 @@ ok('academy5: terminal page is a self-contained shell surface', () => {
 
 ok('academy5: terminal wiring across main, academy, preload', () => {
   const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
-  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.0-academy5"/.test(main), 'build label is academy5');
+  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.0-minion1"/.test(main), 'build label is minion1');
   assert.ok(/__academyTerminal/.test(main), 'activate handler can tell the terminal window apart');
   const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
   assert.ok(/label: 'Terminal'/.test(academy), 'View menu carries the Terminal item');
@@ -366,7 +396,7 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
   assert.ok(/preload: ACADEMY_PRELOAD,/.test(main.replace(/\s+/g, ' ')) || /preload: ACADEMY_PRELOAD/.test(main), 'popup carries the preload');
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
   assert.strictEqual(pkg.version, '0.4.0');
-  assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.muse');
+  assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.minion');
 });
 
 // ---- Markdown routing (0.4.0-academy3, Distro files/24 MD-T1) ----
@@ -419,7 +449,7 @@ ok('academy state: markdownRoute round-trips; invalid values fall back to macdow
     }
     let template = null;
     const ctx = {
-      app: { getPath: () => dir, getName: () => 'Muse', setAboutPanelOptions: () => {} },
+      app: { getPath: () => dir, getName: () => 'Minion', setAboutPanelOptions: () => {} },
       BrowserWindow: class {
         static getAllWindows() { return []; }
         static getFocusedWindow() { return null; }
@@ -640,7 +670,7 @@ function installAcademyT3({ stateObj, ls, dialogResponses }) {
   let template = null;
   const academy = freshAcademy();
   const ctx = {
-    app: { getPath: () => dir, getName: () => 'Muse', setAboutPanelOptions: () => {}, getVersion: () => '0.4.0' },
+    app: { getPath: () => dir, getName: () => 'Minion', setAboutPanelOptions: () => {}, getVersion: () => '0.4.0' },
     BrowserWindow: class {
       static getAllWindows() { return []; }
       static getFocusedWindow() { return null; }
@@ -788,7 +818,7 @@ async function terminalBehaviorGroups() {
     const academy = freshAcademy();
     const ctx = {
       app: {
-        getPath: () => dir, getName: () => 'Muse',
+        getPath: () => dir, getName: () => 'Minion',
         setAboutPanelOptions: () => {}, getVersion: () => '0.4.0',
         on: () => {},
       },
@@ -803,7 +833,7 @@ async function terminalBehaviorGroups() {
         on: (channel, fn) => listeners.set(channel, fn),
         removeListener: () => {},
       },
-      buildLabel: '0.4.0-academy5',
+      buildLabel: '0.4.0-minion1',
     };
     const layer = academy.install(ctx);
 
@@ -869,7 +899,7 @@ async function terminalBehaviorGroups() {
 
     // Build info is the runtime plist version for the terminal only.
     assert.deepStrictEqual(await info({ sender: termWin.webContents }),
-      { name: 'Muse (Academy Build)', version: '0.4.0', build: '0.4.0-academy5' });
+      { name: 'Minion', version: '0.4.0', build: '0.4.0-minion1' });
     assert.strictEqual(await info({ sender: hostWin.webContents }), null);
   });
 }

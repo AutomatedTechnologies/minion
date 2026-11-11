@@ -21,6 +21,19 @@
  *    are gone, not defaulted-off. Legacy terminalSkin / skinEpoch
  *    keys in a state file are ignored on load and dropped on the
  *    next save (saveState writes a fixed field set).
+ *  - Appearance (0.4.0-minion3): the shell's color scheme,
+ *    applied through Electron's nativeTheme — the lever that
+ *    sets prefers-color-scheme for every webContents. DARK by
+ *    default (owner directive 2026-11-10 22:36 EST): on a fresh
+ *    profile the app presents dark. The default is a seed, not
+ *    a lock — the owner's explicit choice (View menu, Dark /
+ *    Light / System) persists as `appearance` in the state file
+ *    and is the value applied on every later launch; the dark
+ *    default fills only the unset branch. On the 10.13 floor
+ *    this lever is decisive: High Sierra has no system dark
+ *    mode, so 'system' resolves light there and only an
+ *    explicit themeSource makes the hosted UI's dark scheme
+ *    reachable at all.
  *  - Markdown routing (0.4.0-academy3, Distro files/24): the
  *    owner's preference for where a downloaded markdown file
  *    opens — MacDown (default), Ask Each Time, or the system
@@ -80,6 +93,36 @@ function install(ctx) {
   // left it — validated against the current displays on restore
   // (window-state.cjs), never trusted blind.
   let windowState = null;
+  // Appearance (0.4.0-minion3): the owner's explicit color-scheme
+  // choice — 'dark' | 'light' | 'system' — or null while unset.
+  // Unset means the build's default: dark. The choice is applied
+  // through nativeTheme.themeSource, which is what sets
+  // prefers-color-scheme for the hosted page and the shell's own
+  // windows alike.
+  let appearance = null;
+
+  function effectiveAppearance() {
+    return appearance || 'dark';
+  }
+
+  function applyAppearance() {
+    try {
+      if (ctx.nativeTheme) {
+        ctx.nativeTheme.themeSource = effectiveAppearance();
+      }
+    } catch (error) {
+      // No nativeTheme in this context (a stubbed shell): the
+      // preference still persists and applies where the lever
+      // exists.
+    }
+  }
+
+  function setAppearance(next) {
+    if (!['dark', 'light', 'system'].includes(next)) return;
+    appearance = next;
+    applyAppearance();
+    saveState();
+  }
 
   function loadState() {
     try {
@@ -105,6 +148,9 @@ function install(ctx) {
             isMaximized: data.window.isMaximized === true,
           };
         }
+        if (['dark', 'light', 'system'].includes(data.appearance)) {
+          appearance = data.appearance;
+        }
       }
     } catch (error) {
       // No state yet (first launch) or an unreadable file: defaults.
@@ -122,6 +168,7 @@ function install(ctx) {
         markdownDefaultPrevHandler: markdownDefaultPrevHandler,
         markdownDefaultNeverAsk: markdownDefaultNeverAsk,
         window: windowState,
+        appearance: appearance,
       }), { mode: 0o600 });
       fs.renameSync(tmp, statePath);
     } catch (error) {
@@ -129,6 +176,10 @@ function install(ctx) {
     }
   }
   loadState();
+  // Dark by default, the owner's stored choice when there is
+  // one: applied before any window exists, so the first paint of
+  // a fresh profile is already dark.
+  applyAppearance();
 
   function senderIsMuse(event) {
     try {
@@ -603,6 +654,29 @@ function install(ctx) {
             click: () => showTerminal(),
           },
           {
+            label: 'Appearance',
+            submenu: [
+              {
+                label: 'Dark',
+                type: 'radio',
+                checked: effectiveAppearance() === 'dark',
+                click: () => setAppearance('dark'),
+              },
+              {
+                label: 'Light',
+                type: 'radio',
+                checked: appearance === 'light',
+                click: () => setAppearance('light'),
+              },
+              {
+                label: 'System',
+                type: 'radio',
+                checked: appearance === 'system',
+                click: () => setAppearance('system'),
+              },
+            ],
+          },
+          {
             label: 'Markdown Files Open In',
             submenu: [
               {
@@ -693,7 +767,7 @@ function install(ctx) {
 
   app.setAboutPanelOptions({
     applicationName: 'Minion',
-    applicationVersion: ctx.buildLabel || '0.4.0-minion2',
+    applicationVersion: ctx.buildLabel || '0.4.0-minion3',
     version: '0.4.0',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +
@@ -714,6 +788,8 @@ function install(ctx) {
       neverAsk: markdownDefaultNeverAsk,
       isCurrent: markdownDefaultIsCurrent(),
     }),
+    getAppearance: () => effectiveAppearance(),
+    setAppearance: setAppearance,
     getWindowState: () => windowState,
     setWindowState: (bounds, isMaximized) => {
       windowState = { bounds: bounds || null, isMaximized: !!isMaximized };

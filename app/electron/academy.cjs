@@ -308,7 +308,7 @@ function install(ctx) {
   ipcMain.handle('academy:terminal:info', (event) => {
     if (!senderIsTerminal(event)) return null;
     return {
-      name: 'Muse (Academy Build)',
+      name: 'Minion',
       version: app.getVersion(),
       build: ctx.buildLabel || '',
     };
@@ -334,7 +334,7 @@ function install(ctx) {
       return terminalWindow;
     }
     terminalWindow = new BrowserWindow({
-      title: 'Terminal — Muse (Academy Build)',
+      title: 'Terminal — Minion',
       width: 980,
       height: 640,
       minWidth: 560,
@@ -482,7 +482,7 @@ function install(ctx) {
       const url = event.sender.getURL();
       if (url.startsWith('file:') && url.indexOf('welcome.html') !== -1) {
         event.returnValue = {
-          name: 'Muse (Academy Build)',
+          name: 'Minion',
           version: app.getVersion(),
           build: ctx.buildLabel || '',
         };
@@ -500,7 +500,7 @@ function install(ctx) {
       return welcomeWindow;
     }
     welcomeWindow = new BrowserWindow({
-      title: 'Welcome — Muse (Academy Build)',
+      title: 'Welcome — Minion',
       width: 680,
       height: 540,
       resizable: false,
@@ -566,7 +566,7 @@ function install(ctx) {
         submenu: [
           {
             role: 'about',
-            label: 'About Muse (Academy Build)',
+            label: 'About Minion',
           },
           {
             label: 'Welcome Screen…',
@@ -692,8 +692,8 @@ function install(ctx) {
   buildMenu();
 
   app.setAboutPanelOptions({
-    applicationName: 'Muse (Academy Build)',
-    applicationVersion: ctx.buildLabel || '0.4.0-academy5',
+    applicationName: 'Minion',
+    applicationVersion: ctx.buildLabel || '0.4.0-minion1',
     version: '0.4.0',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +

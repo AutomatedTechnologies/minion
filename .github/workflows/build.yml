@@ -34,7 +34,7 @@ jobs:
       - name: Check out build source
         uses: actions/checkout@v4
 
-      - name: Unit tests (history, window-state, skin, markdown routing + SDS-10 scans)
+      - name: Unit tests (history, window-state, terminal, markdown routing + SDS-10 scans)
         run: node test/run-tests.cjs
 
       - name: Download the MD-T3 helper
@@ -58,7 +58,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create muse-academy-0.4.0-academy4 \
+          gh release create muse-academy-0.4.0-academy5 \
             Muse-Academy-1013-x64.zip \
-            --title "Muse (Academy Build) 0.4.0-academy4" \
-            --notes "Markdown routing completes its design (Distro files/24): the consented system default (MD-T3) and the Distro deep link (DISTRO-DL1). New in academy4: after the first successful route to MacDown, Muse offers once — Make Default / Not Now / Never Ask — to make MacDown the default app for markdown files everywhere on the Mac. The change is made only on an explicit yes, by the bundled AcademyLSDefault helper, for markdown files only (plain text is never touched); the previous default is recorded first and restored if the standing View-menu checkbox is later unchecked. The fallback dialog's Get MacDown in Distro button now deep-links (academy-distro://app/macdown) straight to MacDown's page in Distro (distro-test-41+). Everything else stands from academy3: download routing to MacDown with its View-menu preference, the whitelist terminal skin, window repair, up-arrow history, SDS-8 welcome, SDS-10 identity — and preload.cjs and terminal-skin.css remain byte-identical to academy2. Built from the open-source muse-desktop v0.3.0 (MIT) on the pinned Electron 22.3.27 distribution. Unsigned test build. Unofficial build: not a Meta product and not endorsed by Meta."
+            --title "Muse (Academy Build) 0.4.0-academy5" \
+            --notes "The genuine Terminal build (Distro files/19 section 10), on the owner's ruling of 2026-11-10 21:12 EST. (1) The terminal skin is DELETED — stylesheet file, View-menu toggle, skin IPC and the SKIN_EPOCH machinery are gone, not defaulted-off; the artifact self-verifies that no terminal-skin.css ships; the stock hosted UI returns untouched. Removal was ordered at the academy2 rig verdict (18:30 EST) and is settled definitively here: academy3/academy4 kept the sheet byte-identical under the approved MD design (files/19 section 7.4), so no earlier catalog note could claim it. (2) A genuine Terminal view (View menu, Command-T): the shell's own window — monochrome, monospace, scrollback, prompt line minion ❯ with a real bordered text field. It is a front-end over the live hosted session: the send is driven into the hosted window's composer through the preload bridge and the reply is observed from the hosted message stream as it renders (snapshot deltas at poll pace, not an API token stream). Local commands: /clear, /help, /view. The window hides rather than closes, so the scrollback survives switching views. (3) Academy bundle identity: this build ships under com.detroitautomationacademy.muse — the owner revoked the ai.muse.desktop carve-out on 2026-11-10 21:14 EST. macOS treats the new identity as a new app: expect a fresh sign-in on first launch; message history and preferences carry (the data folder is path-pinned and did not move). Everything else stands from academy4: markdown routing + consented system default + Distro deep link, window repair, up-arrow history, SDS-8 welcome, SDS-10 identity. Built from the open-source muse-desktop v0.3.0 (MIT) on the pinned Electron 22.3.27 distribution. Unsigned test build. Unofficial build: not a Meta product and not endorsed by Meta."

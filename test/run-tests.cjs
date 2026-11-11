@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Muse (Academy Build) v0.4.0-academy4 verification.
+ * run-tests.cjs — Muse (Academy Build) v0.4.0-academy5 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -8,10 +8,14 @@
  *     draft preservation + restore, Escape, edit-never-mutates.
  *  3. The preload.cjs mirror of the navigator is byte-identical to
  *     the history.cjs block between the history-nav markers.
- *  4. terminal-skin.css + welcome.html: every hex color is a gray
+ *  4. terminal.html + welcome.html: every hex color is a gray
  *     (R=G=B); no remote references, gradients, or backdrop filters.
  *  5. App layer floor audit: no syntax or API past the Electron 22 /
  *     Chromium 108 / macOS 10.13 floor in the new code.
+ *  6. academy5: the terminal skin is deleted (file, channels, menu
+ *     toggle, epoch machinery); the bundle identity is the Academy
+ *     identifier; the Terminal view is wired across main, academy
+ *     and preload, and behaves honestly against a stubbed shell.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -28,10 +32,10 @@ function ok(name, fn) {
 }
 
 // 0. Syntax: every shipped script parses.
-for (const f of ['main.cjs', 'utils.cjs', 'academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'window-law.cjs', 'window-state.cjs', 'md-classify.cjs', 'md-route.cjs']) {
+for (const f of ['main.cjs', 'utils.cjs', 'academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'terminal-preload.cjs', 'window-law.cjs', 'window-state.cjs', 'md-classify.cjs', 'md-route.cjs']) {
   execFileSync(process.execPath, ['--check', path.join(ELE, f)]);
 }
-ok('node --check clean on all 10 app-layer scripts', () => {});
+ok('node --check clean on all 11 app-layer scripts', () => {});
 
 const ws = require(path.join(ELE, 'window-state.cjs'));
 const AIR = { x: 0, y: 23, width: 1440, height: 877 }; // 13" Air work area
@@ -223,79 +227,98 @@ function assertGrayscale(file) {
   assert.ok(!/hsl\(/.test(text), file + ': hsl() present');
 }
 
-ok('terminal-skin.css: monochrome ramp only; no remote/gradient/blur', () => {
-  assertGrayscale(path.join(ELE, 'terminal-skin.css'));
-  const css = fs.readFileSync(path.join(ELE, 'terminal-skin.css'), 'utf8');
-  // academy2 amendment: the ONLY url() permitted is the inline SVG
-  // data URI carrying the composer's prompt glyph — it fetches
-  // nothing. Any other url() (remote or local file) fails. The
-  // remote-ref scan runs with data URIs removed: the SVG xmlns
-  // inside the payload is a namespace identifier, not a reference.
-  const urls = css.match(/url\([^)]*\)/g) || [];
-  assert.ok(!/https?:\/\//.test(css.replace(/url\([^)]*\)/g, '')), 'no remote refs');
-  for (const u of urls) {
-    assert.ok(u.startsWith('url("data:image/svg+xml,'), 'url() must be the inline SVG glyph, got: ' + u.slice(0, 60));
-  }
-  assert.ok(!/gradient/.test(css), 'no gradients');
-  assert.ok(!/backdrop-filter/.test(css), 'no backdrop blur');
-  assert.ok(/html\.academy-terminal/.test(css), 'rules are class-gated');
-});
-
-ok('terminal-skin.css: whitelist discipline (academy2 rebuild)', () => {
-  const raw = fs.readFileSync(path.join(ELE, 'terminal-skin.css'), 'utf8');
-  // Strip comments before scanning: the header documents the ban
-  // in prose and must not trip its own enforcement.
-  const css = raw.replace(/\/\*[\s\S]*?\*\//g, '');
-  // Parse rules: selector list + declaration block.
-  const rules = [];
-  const re = /([^{}]+)\{([^{}]*)\}/g;
-  let m;
-  while ((m = re.exec(css)) !== null) rules.push({ sel: m[1].trim(), body: m[2] });
-  assert.ok(rules.length >= 4, 'skin rules present');
-  const MARKERS = ['.academy-stream', '.academy-composer', '.academy-composer-shell'];
-  for (const rule of rules) {
-    const selectors = rule.sel.split(',').map((s) => s.trim()).filter(Boolean);
-    assert.ok(selectors.length > 0, 'rule has selectors');
-    for (const sel of selectors) {
-      // Gate: every selector requires the html class (kill-switch
-      // soundness — removing the class restores the stock UI).
-      assert.ok(sel.startsWith('html.academy-terminal'), 'selector not class-gated: ' + sel);
-      // Scope: after the gate, the next compound is a marker class,
-      // never a generic element, the universal selector, or body.
-      assert.ok(MARKERS.some((k) => sel.startsWith('html.academy-terminal ' + k)),
-        'selector not scoped to a whitelist marker: ' + sel);
-    }
-    // Declarations: typography, color, caret, matched tints, the
-    // painted left rule — and nothing that can move a box.
-    const banned = /(^|;)\s*(display|position|width|height|min-width|max-width|min-height|max-height|margin|padding|overflow|z-index|float|top|left|right|bottom|border|visibility|transform|opacity)\s*:/;
-    assert.ok(!banned.test(';' + rule.body), 'banned layout property in rule: ' + rule.sel);
-  }
-  // The painted left rule is the sheet's only box-shadow.
-  assert.strictEqual((css.match(/box-shadow/g) || []).length, 1, 'exactly one box-shadow (the shell rule)');
-  // The root elements carry no rules (the academy1 takeover ban).
-  assert.ok(!/html\.academy-terminal\s*,/.test(css), 'no bare html gate rule');
-  assert.ok(!/html\.academy-terminal\s+body/.test(css), 'no body rules');
-});
-
-ok('skin preference epoch: an academy1 ON cannot survive the upgrade', () => {
+ok('academy5: the terminal skin is deleted, not disabled', () => {
+  // Definitive removal (owner ruling 2026-11-10 21:12 EST): the
+  // sheet file is gone from the source tree, the skin IPC channels
+  // and the epoch machinery are gone from both processes, the
+  // View-menu toggle is gone, and the assembler's expected-file
+  // list carries the terminal surface instead of the sheet. (The
+  // assembler's artifact self-verify separately asserts no
+  // terminal-skin.css entry ships in the zip.)
+  assert.strictEqual(fs.existsSync(path.join(ELE, 'terminal-skin.css')), false,
+    'terminal-skin.css must not exist');
   const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
-  assert.ok(/const SKIN_EPOCH = 2;/.test(academy), 'epoch constant at 2');
-  assert.ok(/data\.skinEpoch >= SKIN_EPOCH && data\.terminalSkin === true/.test(academy),
-    'load honors the persisted preference only at the current epoch');
-  assert.ok(/skinEpoch: SKIN_EPOCH/.test(academy), 'save stamps the current epoch');
-  // The toggle path itself is unchanged and total: class on/off via
-  // the broadcast, state saved — verified in preload below.
   const preload = fs.readFileSync(path.join(ELE, 'preload.cjs'), 'utf8');
-  assert.ok(/classList\.toggle\('academy-terminal', !!on\)/.test(preload),
-    'kill-switch toggles the single gating class');
+  assert.ok(!/academy:skin/.test(academy), 'no skin IPC in the main layer');
+  assert.ok(!/academy:skin/.test(preload), 'no skin IPC in the preload');
+  assert.ok(!/const SKIN_EPOCH/.test(academy), 'epoch machinery deleted');
+  assert.ok(!/setTerminalSkin/.test(academy), 'skin setter deleted');
+  assert.ok(!/'Terminal Skin'/.test(academy), 'skin menu toggle deleted');
+  assert.ok(!/classList\.toggle\('academy-terminal'/.test(preload), 'skin class toggle deleted');
+  const assemble = fs.readFileSync(path.join(APP, '..', 'tools', 'assemble.py'), 'utf8');
+  const expectedBlock = assemble.match(/EXPECTED_APP_FILES = \[([\s\S]*?)\]/);
+  assert.ok(expectedBlock, 'assembler expected-file list present');
+  assert.ok(!/terminal-skin\.css/.test(expectedBlock[1]), 'sheet not in the expected files');
+  assert.ok(/terminal\.html/.test(expectedBlock[1]), 'terminal page expected in the artifact');
+  assert.ok(/terminal-preload\.cjs/.test(expectedBlock[1]), 'terminal preload expected in the artifact');
 });
 
-ok('preload tags exactly the whitelist marker elements', () => {
+ok('academy5: bundle identity is the Academy identifier', () => {
+  // Owner revocation 2026-11-10 21:14 EST: the ai.muse.desktop
+  // carve-out is gone; the line ships under its Academy identity.
+  const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
+  assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.muse');
+  const assemble = fs.readFileSync(path.join(APP, '..', 'tools', 'assemble.py'), 'utf8');
+  assert.ok(/plist\["CFBundleIdentifier"\] = "com\.detroitautomationacademy\.muse"/.test(assemble),
+    'assembler stamps the Academy bundle id');
+  // The old identifier survives in no functional code: not in any
+  // shipped script or the package manifest. (Prose records — the
+  // INSTALL notes, the release notes, this suite's comments —
+  // legitimately name it as history; the assembler's plist stamp
+  // and this manifest are the functional carriers, checked above
+  // and here.)
+  const codeFiles = fs.readdirSync(ELE).filter((f) => f.endsWith('.cjs'));
+  assert.ok(codeFiles.length >= 10, 'app-layer scripts present (' + codeFiles.length + ')');
+  for (const f of codeFiles) {
+    const text = fs.readFileSync(path.join(ELE, f), 'utf8');
+    assert.ok(!/ai\.muse\.desktop/.test(text), 'old bundle id survives in ' + f);
+  }
+});
+
+ok('academy5: terminal page is a self-contained shell surface', () => {
+  assertGrayscale(path.join(ELE, 'terminal.html'));
+  const html = fs.readFileSync(path.join(ELE, 'terminal.html'), 'utf8');
+  assert.ok(!/src="http|href="http/.test(html), 'no remote assets');
+  assert.ok(/minion ❯/.test(html), 'prompt line present');
+  assert.ok(/id="cmd"/.test(html), 'a real text input field is present');
+  assert.ok(/border: 2px solid/.test(html), 'the input field is visibly bordered');
+  for (const cmd of ['/clear', '/help', '/view']) {
+    assert.ok(html.includes(cmd), 'local command ' + cmd + ' handled in the page');
+  }
+  assert.ok(/academyTerminal/.test(html), 'page talks to its preload bridge');
+  const tpreload = fs.readFileSync(path.join(ELE, 'terminal-preload.cjs'), 'utf8');
+  assert.ok(/contextBridge/.test(tpreload), 'bridge uses contextBridge');
+  for (const ch of ['academy:terminal:send', 'academy:terminal:history',
+    'academy:terminal:info', 'academy:terminal:show-hosted', 'academy:terminal:event']) {
+    assert.ok(tpreload.includes(ch), 'terminal preload carries ' + ch);
+  }
+});
+
+ok('academy5: terminal wiring across main, academy, preload', () => {
+  const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
+  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.0-academy5"/.test(main), 'build label is academy5');
+  assert.ok(/__academyTerminal/.test(main), 'activate handler can tell the terminal window apart');
+  const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
+  assert.ok(/label: 'Terminal'/.test(academy), 'View menu carries the Terminal item');
+  assert.ok(/CmdOrCtrl\+T/.test(academy), 'Terminal carries its accelerator');
+  assert.ok(!/CmdOrCtrl\+Shift\+T/.test(academy), 'the skin shortcut is gone');
+  assert.ok(/function showTerminal\(\)/.test(academy), 'terminal window constructor present');
+  assert.ok(/terminal\.html/.test(academy), 'terminal window loads the shell page');
+  assert.ok(/terminal-preload\.cjs/.test(academy), 'terminal window carries its preload');
+  for (const ch of ['academy:terminal:send', 'academy:terminal:history',
+    'academy:terminal:info', 'academy:terminal:show-hosted',
+    'academy:terminal:send-request', 'academy:terminal:history-request']) {
+    assert.ok(academy.includes(ch), 'main layer carries ' + ch);
+  }
   const preload = fs.readFileSync(path.join(ELE, 'preload.cjs'), 'utf8');
-  assert.ok(/classList\.add\('academy-composer'\)/.test(preload), 'composer element tagged');
-  assert.ok(/classList\.add\('academy-composer-shell'\)/.test(preload), 'composer shell tagged');
-  assert.ok(/classList\.add\('academy-stream'\)/.test(preload), 'message stream tagged');
-  assert.ok(/classList\.remove\('academy-stream'\)/.test(preload), 'stale stream tag moved, not duplicated');
+  for (const ch of ['academy:terminal:send-request', 'academy:terminal:send-reply',
+    'academy:terminal:history-request', 'academy:terminal:history-reply',
+    'academy:terminal:event']) {
+    assert.ok(preload.includes(ch), 'hosted preload carries ' + ch);
+  }
+  assert.ok(/type: 'delta'/.test(preload), 'stream snapshots are emitted');
+  assert.ok(/type: 'done'/.test(preload), 'stream completion is emitted');
+  assert.ok(/type: 'state'/.test(preload), 'composer presence is reported as state');
 });
 
 ok('welcome.html: monochrome, self-contained, carries the unofficial line', () => {
@@ -323,7 +346,7 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
     /\.at\(-/, /structuredClone/, /replaceAll\(/, /findLast\(/,
     /Object\.hasOwn/, /top-level await/, /\busing\s+\w+\s*=/,
   ];
-  for (const f of ['academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'md-classify.cjs', 'md-route.cjs']) {
+  for (const f of ['academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'terminal-preload.cjs', 'md-classify.cjs', 'md-route.cjs']) {
     const text = fs.readFileSync(path.join(ELE, f), 'utf8');
     for (const pattern of banned) {
       assert.ok(!pattern.test(text), f + ' uses banned ' + pattern);
@@ -343,7 +366,7 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
   assert.ok(/preload: ACADEMY_PRELOAD,/.test(main.replace(/\s+/g, ' ')) || /preload: ACADEMY_PRELOAD/.test(main), 'popup carries the preload');
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
   assert.strictEqual(pkg.version, '0.4.0');
-  assert.strictEqual(pkg.build.appId, 'ai.muse.desktop');
+  assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.muse');
 });
 
 // ---- Markdown routing (0.4.0-academy3, Distro files/24 MD-T1) ----
@@ -718,8 +741,142 @@ async function markdownDefaultGroups() {
   });
 }
 
+// academy5 terminal behavior: the window, the relay, and the
+// honest failure — exercised against a stubbed shell (no Electron).
+async function terminalBehaviorGroups() {
+  await okAsync('academy5: terminal window, bridge relay, honest failure (stubbed shell)', async () => {
+    const os = require('node:os');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'academy-t5-'));
+    fs.writeFileSync(path.join(dir, 'academy-state.json'),
+      JSON.stringify({ welcomeSeen: true }));
+    const handlers = new Map();
+    const listeners = new Map();
+    class FakeContents {
+      constructor(url) {
+        this.url = url || '';
+        this.sent = [];
+        this.onceHandlers = new Map();
+      }
+      send(channel, payload) { this.sent.push([channel, payload]); }
+      on() {}
+      once(channel, fn) { this.onceHandlers.set(channel, fn); }
+      getURL() { return this.url; }
+    }
+    class FakeWindow {
+      constructor(opts) {
+        this.opts = opts || {};
+        this.webContents = new FakeContents(this.opts.__url || '');
+        this.destroyed = false;
+        this.visible = false;
+        FakeWindow.instances.push(this);
+      }
+      loadFile(p) { this.loadedFile = p; return Promise.resolve(); }
+      on() {}
+      once() {}
+      isDestroyed() { return this.destroyed; }
+      isMinimized() { return false; }
+      restore() {}
+      show() { this.visible = true; }
+      hide() { this.visible = false; }
+      focus() {}
+      close() { this.destroyed = true; }
+    }
+    FakeWindow.instances = [];
+    FakeWindow.getAllWindows = () => FakeWindow.instances.filter((w) => !w.destroyed);
+    FakeWindow.getFocusedWindow = () => null;
+    let template = null;
+    const academy = freshAcademy();
+    const ctx = {
+      app: {
+        getPath: () => dir, getName: () => 'Muse',
+        setAboutPanelOptions: () => {}, getVersion: () => '0.4.0',
+        on: () => {},
+      },
+      BrowserWindow: FakeWindow,
+      Menu: {
+        buildFromTemplate: (t) => { template = t; return { items: [] }; },
+        setApplicationMenu: () => {},
+      },
+      dialog: { showMessageBox: async () => ({ response: 0 }) },
+      ipcMain: {
+        handle: (channel, fn) => handlers.set(channel, fn),
+        on: (channel, fn) => listeners.set(channel, fn),
+        removeListener: () => {},
+      },
+      buildLabel: '0.4.0-academy5',
+    };
+    const layer = academy.install(ctx);
+
+    // The View menu: Terminal first-class, skin nowhere.
+    const view = template.find((t) => t.label === 'View');
+    const termItem = view.submenu.find((i) => i.label === 'Terminal');
+    assert.ok(termItem, 'Terminal item present in the View menu');
+    assert.strictEqual(termItem.accelerator, 'CmdOrCtrl+T');
+    assert.ok(!view.submenu.some((i) => i.label === 'Terminal Skin'),
+      'no skin toggle in the View menu');
+
+    // The terminal window itself.
+    const termWin = layer.showTerminal();
+    assert.ok(/terminal-preload\.cjs$/.test(termWin.opts.webPreferences.preload),
+      'terminal window carries the terminal preload');
+    assert.ok(/terminal\.html$/.test(termWin.loadedFile),
+      'terminal window loads the shell terminal page');
+    assert.strictEqual(termWin.__academyTerminal, true,
+      'terminal window is marked for the activate handler');
+
+    const send = handlers.get('academy:terminal:send');
+    const history = handlers.get('academy:terminal:history');
+    const info = handlers.get('academy:terminal:info');
+    assert.ok(send && history && info, 'terminal IPC handlers registered');
+
+    // Honest failure 1: no hosted window yet — the send is refused
+    // with the reason, never echoed as if sent.
+    const refused = await send({ sender: termWin.webContents }, 'hello');
+    assert.strictEqual(refused.ok, false);
+    assert.ok(/not open yet/.test(refused.error), 'refusal names the cause');
+
+    // A non-terminal sender is refused outright.
+    const alien = await send({ sender: new FakeContents('https://muse.ai/') }, 'hello');
+    assert.strictEqual(alien.ok, false);
+
+    // The hosted window arrives through the welcome gate.
+    const hostWin = new FakeWindow({ __url: 'https://muse.ai/chat/1' });
+    layer.gateWelcome(() => hostWin);
+
+    // A real relay: the request lands on the hosted webContents;
+    // the hosted reply resolves the send.
+    const pending = send({ sender: termWin.webContents }, 'hello');
+    const req = hostWin.webContents.sent.find((s) => s[0] === 'academy:terminal:send-request');
+    assert.ok(req, 'send-request relayed to the hosted window');
+    assert.strictEqual(req[1].text, 'hello');
+    listeners.get('academy:terminal:send-reply')(
+      { sender: hostWin.webContents }, { id: req[1].id, ok: true, error: '' });
+    const done = await pending;
+    assert.strictEqual(done.ok, true);
+
+    // The send landed in the shared history store (fallback key),
+    // and the history relay round-trips the hosted conversation's
+    // entries; a non-terminal caller gets nothing.
+    const saved = JSON.parse(fs.readFileSync(path.join(dir, 'academy-state.json'), 'utf8'));
+    assert.deepStrictEqual(saved.history.conversations['muse:terminal'].entries, ['hello']);
+    assert.deepStrictEqual(await history({ sender: hostWin.webContents }), []);
+    const pendingHistory = history({ sender: termWin.webContents });
+    const hreq = hostWin.webContents.sent.find((s) => s[0] === 'academy:terminal:history-request');
+    assert.ok(hreq, 'history-request relayed to the hosted window');
+    listeners.get('academy:terminal:history-reply')(
+      { sender: hostWin.webContents }, { id: hreq[1].id, key: 'muse:/chat/1', items: ['older', 'hello'] });
+    assert.deepStrictEqual(await pendingHistory, ['older', 'hello']);
+
+    // Build info is the runtime plist version for the terminal only.
+    assert.deepStrictEqual(await info({ sender: termWin.webContents }),
+      { name: 'Muse (Academy Build)', version: '0.4.0', build: '0.4.0-academy5' });
+    assert.strictEqual(await info({ sender: hostWin.webContents }), null);
+  });
+}
+
 markdownRouterGroups()
   .then(markdownDefaultGroups)
+  .then(terminalBehaviorGroups)
   .then(() => {
     console.log('\nALL ' + passed + ' TEST GROUPS PASSED');
   })

@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Minion v0.4.0-minion2 verification.
+ * run-tests.cjs — Minion v0.4.0-minion3 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -16,6 +16,10 @@
  *     toggle, epoch machinery); the bundle identity is the Academy
  *     identifier; the Terminal view is wired across main, academy
  *     and preload, and behaves honestly against a stubbed shell.
+ *  7. minion3: the hosted window's title is pinned to Minion
+ *     against the page's title updates; the appearance defaults
+ *     to dark through nativeTheme, persists the owner's explicit
+ *     choice, and never stomps it on a later launch.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -253,7 +257,7 @@ ok('academy5: the terminal skin is deleted, not disabled', () => {
   assert.ok(/terminal-preload\.cjs/.test(expectedBlock[1]), 'terminal preload expected in the artifact');
 });
 
-ok('minion2: bundle identity is the Academy identifier', () => {
+ok('minion3: bundle identity is the Academy identifier', () => {
   // Owner revocation 2026-11-10 21:14 EST: the ai.muse.desktop
   // carve-out is gone; the line ships under its Academy identity.
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
@@ -277,7 +281,7 @@ ok('minion2: bundle identity is the Academy identifier', () => {
   }
 });
 
-ok('minion2: the app is named Minion on every shipped surface', () => {
+ok('minion3: the app is named Minion on every shipped surface', () => {
   // Owner rename 2026-11-10 21:49 EST: "rename academy muse to
   // minion." The bundle, the windows, the menu, the welcome and the
   // terminal all carry the one name; the upstream identity survives
@@ -291,6 +295,13 @@ ok('minion2: the app is named Minion on every shipped surface', () => {
     'old product name survives in the main layer');
   const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
   assert.ok(/title: "Minion"/.test(main), 'hosted window titled Minion');
+  // minion3 (owner directive 2026-11-10 22:36 EST): the creation
+  // title alone did not hold — the loaded page's <title> ("Muse")
+  // replaced it on navigation and stood in the title bar on the
+  // owner's Air. The pin refuses the page's title updates.
+  assert.ok(/page-title-updated/.test(main), 'hosted window refuses page title updates');
+  assert.ok(/event\.preventDefault\(\);\s*\n\s*\}\);\s*\n\s*window\.setTitle\("Minion"\)/.test(main),
+    'title pin restates the app name');
   const welcome = fs.readFileSync(path.join(ELE, 'welcome.html'), 'utf8');
   assert.ok(/<h1>Welcome to Minion<\/h1>/.test(welcome), 'welcome headline is Minion');
   assert.ok(!/Terminal Skin/.test(welcome),
@@ -305,7 +316,7 @@ ok('minion2: the app is named Minion on every shipped surface', () => {
     'assembler stamps the Minion executable');
 });
 
-ok('minion2: app data stored separately, keyed to the bundle identity', () => {
+ok('minion3: app data stored separately, keyed to the bundle identity', () => {
   // Owner coding standard (J dir 2026-11-10 22:18 EST): the
   // app's data lives outside the bundle, in its own Application
   // Support location keyed to the bundle ID. Minion's store is
@@ -322,6 +333,39 @@ ok('minion2: app data stored separately, keyed to the bundle identity', () => {
     assert.ok(!/getPath\("appData"\), "Muse"\)/.test(text),
       'the previous version\'s data pin survives in ' + f);
   }
+});
+
+ok('minion3: dark by default through nativeTheme; the owner\'s choice persists, never stomped', () => {
+  // Owner directive 2026-11-10 22:36 EST: dark mode by default.
+  // The lever is Electron's nativeTheme.themeSource — it sets
+  // prefers-color-scheme for every webContents, and on the 10.13
+  // floor (no system dark mode) it is the only lever that exists.
+  // Default = a seed in the unset branch only: an explicit choice
+  // is stored as `appearance` and is what later launches apply.
+  const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
+  assert.ok(/nativeTheme/.test(main), 'main process holds the nativeTheme lever');
+  assert.ok(/nativeTheme,?\s*\n?\s*buildLabel/.test(main) || /nativeTheme/.test(main.split('academy.install')[1] || ''),
+    'the lever is passed to the feature layer');
+  const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
+  assert.ok(/ctx\.nativeTheme\.themeSource = effectiveAppearance\(\)/.test(academy),
+    'the stored-or-default scheme is applied through themeSource');
+  assert.ok(/return appearance \|\| 'dark'/.test(academy),
+    'the unset branch defaults to dark');
+  assert.ok(/\['dark', 'light', 'system'\]\.includes\(data\.appearance\)/.test(academy),
+    'a stored choice is read back on launch');
+  assert.ok(/appearance: appearance/.test(academy),
+    'the choice is written to the state file');
+  assert.ok(/label: 'Appearance'/.test(academy), 'View menu carries Appearance');
+  for (const opt of ['Dark', 'Light', 'System']) {
+    assert.ok(new RegExp("setAppearance\\('" + opt.toLowerCase() + "'\\)").test(academy),
+      'Appearance offers ' + opt);
+  }
+  // The deleted terminal skin stays deleted: no stylesheet, no
+  // scheme is faked by styling the hosted page.
+  assert.ok(!fs.existsSync(path.join(ELE, 'terminal-skin.css')), 'skin stylesheet still absent');
+  const preload = fs.readFileSync(path.join(ELE, 'preload.cjs'), 'utf8');
+  assert.ok(!/prefers-color-scheme|themeSource/.test(preload),
+    'the preload does not touch the scheme — the lever is the shell\'s');
 });
 
 ok('academy5: terminal page is a self-contained shell surface', () => {
@@ -345,7 +389,7 @@ ok('academy5: terminal page is a self-contained shell surface', () => {
 
 ok('academy5: terminal wiring across main, academy, preload', () => {
   const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
-  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.0-minion2"/.test(main), 'build label is minion2');
+  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.0-minion3"/.test(main), 'build label is minion3');
   assert.ok(/__academyTerminal/.test(main), 'activate handler can tell the terminal window apart');
   const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
   assert.ok(/label: 'Terminal'/.test(academy), 'View menu carries the Terminal item');
@@ -852,9 +896,26 @@ async function terminalBehaviorGroups() {
         on: (channel, fn) => listeners.set(channel, fn),
         removeListener: () => {},
       },
-      buildLabel: '0.4.0-minion2',
+      nativeTheme: { themeSource: 'system' },
+      buildLabel: '0.4.0-minion3',
     };
     const layer = academy.install(ctx);
+
+    // minion3 appearance: no stored choice in this profile, so
+    // the install applied the default — dark — through the lever.
+    assert.strictEqual(ctx.nativeTheme.themeSource, 'dark',
+      'fresh profile presents dark by default');
+    assert.strictEqual(layer.getAppearance(), 'dark');
+    // The owner's explicit choice applies immediately, persists
+    // to the state file, and is the value a later launch reads.
+    layer.setAppearance('light');
+    assert.strictEqual(ctx.nativeTheme.themeSource, 'light',
+      'an explicit choice applies at once');
+    const afterChoice = JSON.parse(fs.readFileSync(path.join(dir, 'academy-state.json'), 'utf8'));
+    assert.strictEqual(afterChoice.appearance, 'light',
+      'the choice is persisted, not session-only');
+    layer.setAppearance('dark');
+    assert.strictEqual(ctx.nativeTheme.themeSource, 'dark');
 
     // The View menu: Terminal first-class, skin nowhere.
     const view = template.find((t) => t.label === 'View');
@@ -863,6 +924,11 @@ async function terminalBehaviorGroups() {
     assert.strictEqual(termItem.accelerator, 'CmdOrCtrl+T');
     assert.ok(!view.submenu.some((i) => i.label === 'Terminal Skin'),
       'no skin toggle in the View menu');
+    // minion3: Appearance rides the same menu, three radios.
+    const appearanceItem = view.submenu.find((i) => i.label === 'Appearance');
+    assert.ok(appearanceItem, 'Appearance item present in the View menu');
+    assert.deepStrictEqual(appearanceItem.submenu.map((i) => i.label),
+      ['Dark', 'Light', 'System']);
 
     // The terminal window itself.
     const termWin = layer.showTerminal();
@@ -916,9 +982,36 @@ async function terminalBehaviorGroups() {
       { sender: hostWin.webContents }, { id: hreq[1].id, key: 'muse:/chat/1', items: ['older', 'hello'] });
     assert.deepStrictEqual(await pendingHistory, ['older', 'hello']);
 
+    // minion3 appearance, the other launch: a profile whose state
+    // already carries an explicit choice applies THAT choice —
+    // the dark default never stomps a stored preference.
+    const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'academy-m3-'));
+    fs.writeFileSync(path.join(dir2, 'academy-state.json'),
+      JSON.stringify({ welcomeSeen: true, appearance: 'light' }));
+    const academy2 = freshAcademy();
+    const ctx2 = {
+      app: {
+        getPath: () => dir2, getName: () => 'Minion',
+        setAboutPanelOptions: () => {}, getVersion: () => '0.4.0',
+        on: () => {},
+      },
+      BrowserWindow: FakeWindow,
+      Menu: ctx.Menu,
+      dialog: ctx.dialog,
+      ipcMain: {
+        handle: () => {}, on: () => {}, removeListener: () => {},
+      },
+      nativeTheme: { themeSource: 'system' },
+      buildLabel: '0.4.0-minion3',
+    };
+    const layer2 = academy2.install(ctx2);
+    assert.strictEqual(ctx2.nativeTheme.themeSource, 'light',
+      'a stored explicit choice is the launch value');
+    assert.strictEqual(layer2.getAppearance(), 'light');
+
     // Build info is the runtime plist version for the terminal only.
     assert.deepStrictEqual(await info({ sender: termWin.webContents }),
-      { name: 'Minion', version: '0.4.0', build: '0.4.0-minion2' });
+      { name: 'Minion', version: '0.4.0', build: '0.4.0-minion3' });
     assert.strictEqual(await info({ sender: hostWin.webContents }), null);
   });
 }

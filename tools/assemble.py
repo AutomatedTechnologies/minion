@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble Muse-Academy-1013-x64.zip — Muse (Academy Build) 0.4.0-academy4.
+"""Assemble Muse-Academy-1013-x64.zip — Muse (Academy Build) 0.4.0-academy5.
 
 Construction of record (Distro files/06): the official Electron
 v22.3.27 darwin-x64 distribution (SHA-256 pinned below — a mismatch
@@ -76,7 +76,8 @@ EXPECTED_APP_FILES = [
     "electron/welcome-preload.cjs",
     "electron/welcome.html",
     "electron/app-icon.png",
-    "electron/terminal-skin.css",
+    "electron/terminal.html",
+    "electron/terminal-preload.cjs",
     "electron/startup-sound.wav",
 ]
 
@@ -242,7 +243,14 @@ def main():
         plist["CFBundleDisplayName"] = "Muse"
         plist["CFBundleExecutable"] = "Muse"
         plist["CFBundleIconFile"] = "icon.icns"
-        plist["CFBundleIdentifier"] = "ai.muse.desktop"
+        # academy5: the Academy bundle identity. The ai.muse.desktop
+        # carve-out the earlier builds shipped under was revoked by
+        # the owner 2026-11-10 21:14 EST ("nothing hits Distro
+        # without a disassembly and rebuild"); this build is the
+        # line's own disassembly/scan/rebuild (files/19 sections
+        # 2-10) and carries the Academy identifier like every other
+        # listing.
+        plist["CFBundleIdentifier"] = "com.detroitautomationacademy.muse"
         plist["CFBundleName"] = "Muse"
         plist["CFBundleShortVersionString"] = VERSION
         plist["CFBundleVersion"] = VERSION
@@ -280,7 +288,7 @@ def main():
     z = zipfile.ZipFile(args.out)
     names = z.namelist()
     plist = plistlib.loads(z.read("Muse.app/Contents/Info.plist"))
-    assert plist["CFBundleIdentifier"] == "ai.muse.desktop", "bundle id drifted"
+    assert plist["CFBundleIdentifier"] == "com.detroitautomationacademy.muse", "bundle id drifted"
     assert plist["CFBundleShortVersionString"] == VERSION, "short version drifted"
     assert plist["CFBundleVersion"] == VERSION, "bundle version drifted"
     assert plist["LSMinimumSystemVersion"] == "10.13", "floor drifted"
@@ -298,6 +306,10 @@ def main():
     icon = z.read("Muse.app/Contents/Resources/icon.icns")
     assert hashlib.sha256(icon).hexdigest() == sha256_file(os.path.join(args.assets, "icon.icns")), "icon drifted"
     assert not any(n.endswith("electron.icns") for n in names), "stock icon survived"
+    # academy5: the rejected terminal skin is deleted, and the
+    # artifact must prove it — no skin sheet anywhere in the zip.
+    assert not any(n.endswith("terminal-skin.css") for n in names), \
+        "terminal skin survived into the artifact"
     for rel in EXPECTED_APP_FILES:
         assert f"Muse.app/Contents/Resources/app/{rel}" in names, f"missing app file {rel}"
     macho = 0

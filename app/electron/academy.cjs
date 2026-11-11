@@ -7,17 +7,20 @@
  *    in the app's own data directory (academy-state.json inside
  *    userData), served to the preload over IPC. IPC is accepted
  *    only from the muse.ai origin (utils.cjs isMuseOrigin).
- *  - Terminal skin: a persisted preference toggled from the View
- *    menu; the stylesheet text is served to the preload, which
- *    gates it on the html.academy-terminal class. SDS monochrome —
- *    see terminal-skin.css. The academy2 sheet is whitelist-built
- *    (the academy1 sheet failed on the real hosted UI — owner
- *    screenshot 2026-11-10 17:08 EST, files/19), and the persisted
- *    preference is epoch-gated (SKIN_EPOCH): a state file written
- *    before the current epoch loads with the skin OFF, so an
- *    upgrade can never re-apply a superseded skin unasked, and a
- *    fresh install defaults OFF. Only an explicit toggle in a
- *    build of the current epoch persists ON.
+ *  - Terminal view (0.4.0-academy5, Distro files/19 section 10):
+ *    a first-class shell window (View menu, CmdOrCtrl+T) running
+ *    terminal.html — the shell's own renderer surface, NOT CSS
+ *    over the hosted page. It is a front-end over the live hosted
+ *    session: a send is driven into the hosted window's composer
+ *    through the preload bridge and the reply is observed from the
+ *    hosted message stream as it renders. The terminal skin this
+ *    replaces was REJECTED by the owner (rig verdict 2026-11-10
+ *    18:30 EST: solid black composer bar, no text field) and is
+ *    DELETED in this build — the stylesheet file, the View-menu
+ *    toggle, the skin IPC channels and the SKIN_EPOCH machinery
+ *    are gone, not defaulted-off. Legacy terminalSkin / skinEpoch
+ *    keys in a state file are ignored on load and dropped on the
+ *    next save (saveState writes a fixed field set).
  *  - Markdown routing (0.4.0-academy3, Distro files/24): the
  *    owner's preference for where a downloaded markdown file
  *    opens — MacDown (default), Ask Each Time, or the system
@@ -44,14 +47,6 @@ const { MACDOWN_BUNDLE_ID } = require('./md-route.cjs');
 
 const STATE_FILE = 'academy-state.json';
 
-// Terminal-skin preference epoch. Epoch 2 = the whitelist-rebuilt
-// sheet (0.4.0-academy2). A persisted skin preference is honored
-// only when the state file carries the CURRENT epoch; anything
-// older (including every academy1 state file, which has no epoch)
-// loads with the skin OFF and must be re-enabled by hand. Bump
-// this whenever the sheet's discipline changes materially.
-const SKIN_EPOCH = 2;
-
 function earlyInit(app) {
   // The SDS-8 startup sound plays from the welcome window without a
   // prior user gesture; without this switch Chromium's autoplay
@@ -67,7 +62,6 @@ function install(ctx) {
   const { app, BrowserWindow, Menu, dialog, ipcMain } = ctx;
   const statePath = path.join(app.getPath('userData'), STATE_FILE);
   const store = createHistoryStore();
-  let terminalSkin = false;
   let welcomeSeen = false;
   // Markdown routing preference (files/24 section 5a): where a
   // downloaded .md/.markdown opens. 'macdown' is the default —
@@ -92,12 +86,10 @@ function install(ctx) {
       const data = JSON.parse(fs.readFileSync(statePath, 'utf8'));
       if (data && typeof data === 'object') {
         store.load(data.history);
-        // Epoch gate: a pre-epoch (or older-epoch) state file must
-        // not resurrect a superseded skin on upgrade — the academy1
-        // preference, written while its chaotic sheet was live, is
-        // deliberately dropped here; the owner re-enables the skin
-        // explicitly if he wants the rebuilt one.
-        terminalSkin = data.skinEpoch >= SKIN_EPOCH && data.terminalSkin === true;
+        // academy5: the terminal skin is deleted. A state file
+        // written by academy1–academy4 may still carry
+        // terminalSkin / skinEpoch keys; they are read by nothing
+        // and dropped on the next save.
         welcomeSeen = data.welcomeSeen === true;
         if (['macdown', 'ask', 'system'].includes(data.markdownRoute)) {
           markdownRoute = data.markdownRoute;
@@ -125,8 +117,6 @@ function install(ctx) {
       fs.writeFileSync(tmp, JSON.stringify({
         version: 1,
         history: store.toJSON(),
-        terminalSkin: terminalSkin,
-        skinEpoch: SKIN_EPOCH,
         welcomeSeen: welcomeSeen,
         markdownRoute: markdownRoute,
         markdownDefaultPrevHandler: markdownDefaultPrevHandler,
@@ -166,36 +156,215 @@ function install(ctx) {
     return entries;
   });
 
-  ipcMain.handle('academy:skin:get', (event) => {
-    if (!senderIsMuse(event)) return false;
-    return terminalSkin;
-  });
+  // ---- Terminal view (0.4.0-academy5, files/19 section 10) ----
+  // The terminal window is the shell's own renderer surface
+  // (terminal.html + terminal-preload.cjs). It holds no session of
+  // its own: a send is relayed to the hosted window, whose preload
+  // drives the page's real composer and observes the message
+  // stream as it renders; stream events flow back here and are
+  // forwarded to the terminal window. If the hosted window or its
+  // composer is absent the send FAILS with the reason — the
+  // terminal never echoes a message locally as if it were sent.
 
-  let skinCss = '';
-  try {
-    skinCss = fs.readFileSync(path.join(__dirname, 'terminal-skin.css'), 'utf8');
-  } catch (error) {
-    console.warn('Terminal skin stylesheet missing');
+  let hostedWindow = null;
+  let terminalWindow = null;
+  let appQuitting = false;
+  let lastHostState = null;
+  let termSendSeq = 0;
+  const pendingSends = new Map();
+  const pendingHistory = new Map();
+
+  if (typeof app.on === 'function') {
+    app.on('before-quit', () => { appQuitting = true; });
   }
-  ipcMain.handle('academy:skin:css', (event) => {
-    if (!senderIsMuse(event)) return '';
-    return skinCss;
-  });
 
-  function broadcastSkin() {
-    for (const win of BrowserWindow.getAllWindows()) {
-      try {
-        win.webContents.send('academy:skin:apply', terminalSkin);
-      } catch (error) { /* window going away */ }
+  function findHostedWindow() {
+    if (hostedWindow && !hostedWindow.isDestroyed()) return hostedWindow;
+    hostedWindow = null;
+    try {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (win === terminalWindow) continue;
+        if (win.webContents && isMuseOrigin(win.webContents.getURL())) {
+          hostedWindow = win;
+          break;
+        }
+      }
+    } catch (error) { /* no hosted window yet */ }
+    return hostedWindow;
+  }
+
+  function senderIsTerminal(event) {
+    try {
+      return Boolean(terminalWindow) && !terminalWindow.isDestroyed() &&
+        event.sender === terminalWindow.webContents;
+    } catch (error) {
+      return false;
     }
   }
 
-  let skinMenuItem = null;
-  function setTerminalSkin(on) {
-    terminalSkin = !!on;
-    if (skinMenuItem) skinMenuItem.checked = terminalSkin;
-    saveState();
-    broadcastSkin();
+  function sendToTerminal(payload) {
+    try {
+      if (terminalWindow && !terminalWindow.isDestroyed()) {
+        terminalWindow.webContents.send('academy:terminal:event', payload);
+      }
+    } catch (error) { /* terminal going away */ }
+  }
+
+  // Hosted preload -> main: stream + state events, forwarded to
+  // the terminal window. Only the hosted window's events count.
+  ipcMain.on('academy:terminal:event', (event, payload) => {
+    if (!senderIsMuse(event) || !payload || typeof payload !== 'object') return;
+    const host = findHostedWindow();
+    if (host && event.sender !== host.webContents) return;
+    if (payload.type === 'state') lastHostState = payload;
+    sendToTerminal(payload);
+  });
+
+  ipcMain.on('academy:terminal:send-reply', (event, payload) => {
+    if (!senderIsMuse(event) || !payload || !pendingSends.has(payload.id)) return;
+    const pending = pendingSends.get(payload.id);
+    pendingSends.delete(payload.id);
+    clearTimeout(pending.timer);
+    pending.resolve(payload);
+  });
+
+  ipcMain.on('academy:terminal:history-reply', (event, payload) => {
+    if (!senderIsMuse(event) || !payload || !pendingHistory.has(payload.id)) return;
+    const pending = pendingHistory.get(payload.id);
+    pendingHistory.delete(payload.id);
+    clearTimeout(pending.timer);
+    pending.resolve(payload);
+  });
+
+  function relayToHost(channel, payload, pendingMap, timeoutMs, timeoutValue) {
+    const host = findHostedWindow();
+    if (!host) return Promise.resolve(timeoutValue);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pendingMap.delete(payload.id);
+        resolve(timeoutValue);
+      }, timeoutMs);
+      pendingMap.set(payload.id, { resolve: resolve, timer: timer });
+      try {
+        host.webContents.send(channel, payload);
+      } catch (error) {
+        clearTimeout(timer);
+        pendingMap.delete(payload.id);
+        resolve(timeoutValue);
+      }
+    });
+  }
+
+  ipcMain.handle('academy:terminal:send', async (event, text) => {
+    if (!senderIsTerminal(event)) {
+      return { ok: false, error: 'Not the terminal window.' };
+    }
+    if (typeof text !== 'string' || !text.trim()) {
+      return { ok: false, error: 'Nothing to send.' };
+    }
+    const host = findHostedWindow();
+    if (!host) {
+      return {
+        ok: false,
+        error: 'The Muse window is not open yet — open it, sign in, then send.',
+      };
+    }
+    termSendSeq += 1;
+    const id = 'ts' + termSendSeq;
+    const reply = await relayToHost(
+      'academy:terminal:send-request',
+      { id: id, text: text.slice(0, 20000) },
+      pendingSends, 12000,
+      {
+        id: id, ok: false,
+        error: 'The hosted page did not answer. Is the Muse window loaded and signed in?',
+      });
+    if (reply && reply.ok) {
+      // The terminal's own sends also land in the fallback history
+      // key, so up-arrow recall in the terminal works even when the
+      // hosted conversation's history cannot be read back. (The
+      // hosted preload separately records the send into the
+      // conversation's own history when the page sends it.)
+      store.add('muse:terminal', text.trim().slice(0, 20000));
+      saveState();
+    }
+    return reply && typeof reply.ok === 'boolean'
+      ? reply
+      : { ok: false, error: 'The hosted page did not answer.' };
+  });
+
+  ipcMain.handle('academy:terminal:history', async (event) => {
+    if (!senderIsTerminal(event)) return [];
+    termSendSeq += 1;
+    const id = 'th' + termSendSeq;
+    const reply = await relayToHost(
+      'academy:terminal:history-request',
+      { id: id },
+      pendingHistory, 3000, null);
+    if (reply && Array.isArray(reply.items)) return reply.items;
+    return store.list('muse:terminal');
+  });
+
+  ipcMain.handle('academy:terminal:info', (event) => {
+    if (!senderIsTerminal(event)) return null;
+    return {
+      name: 'Muse (Academy Build)',
+      version: app.getVersion(),
+      build: ctx.buildLabel || '',
+    };
+  });
+
+  ipcMain.on('academy:terminal:show-hosted', (event) => {
+    if (!senderIsTerminal(event)) return;
+    const host = findHostedWindow();
+    if (host) {
+      try {
+        if (host.isMinimized()) host.restore();
+        host.show();
+        host.focus();
+      } catch (error) { /* window going away */ }
+    }
+    if (terminalWindow && !terminalWindow.isDestroyed()) terminalWindow.hide();
+  });
+
+  function showTerminal() {
+    if (terminalWindow && !terminalWindow.isDestroyed()) {
+      terminalWindow.show();
+      terminalWindow.focus();
+      return terminalWindow;
+    }
+    terminalWindow = new BrowserWindow({
+      title: 'Terminal — Muse (Academy Build)',
+      width: 980,
+      height: 640,
+      minWidth: 560,
+      minHeight: 360,
+      backgroundColor: '#0a0a0a',
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        preload: path.join(__dirname, 'terminal-preload.cjs'),
+      },
+    });
+    // Marked so main's activate handler restores the hosted window,
+    // not this one, on a Dock click.
+    terminalWindow.__academyTerminal = true;
+    // Hide on close, never destroy: the scrollback lives in this
+    // renderer, and switching views must not lose it. A real
+    // destroy happens only when the app quits.
+    terminalWindow.on('close', (closeEvent) => {
+      if (!appQuitting) {
+        closeEvent.preventDefault();
+        if (terminalWindow) terminalWindow.hide();
+      }
+    });
+    terminalWindow.on('closed', () => { terminalWindow = null; });
+    terminalWindow.webContents.once('did-finish-load', () => {
+      if (lastHostState) sendToTerminal(lastHostState);
+    });
+    void terminalWindow.loadFile(path.join(__dirname, 'terminal.html'));
+    return terminalWindow;
   }
 
   function setMarkdownRoute(route) {
@@ -376,11 +545,17 @@ function install(ctx) {
   }
 
   function gateWelcome(openServiceWindow) {
+    // Capture the hosted window as it is created: the terminal
+    // bridge relays to exactly this window's webContents.
+    const open = () => {
+      const win = openServiceWindow();
+      if (win && win.webContents) hostedWindow = win;
+    };
     if (welcomeSeen) {
-      openServiceWindow();
+      open();
       return;
     }
-    showWelcome(openServiceWindow);
+    showWelcome(open);
   }
 
   // ---- Application menu ----
@@ -423,11 +598,9 @@ function install(ctx) {
         label: 'View',
         submenu: [
           {
-            label: 'Terminal Skin',
-            type: 'checkbox',
-            checked: terminalSkin,
-            accelerator: 'CmdOrCtrl+Shift+T',
-            click: (item) => setTerminalSkin(item.checked),
+            label: 'Terminal',
+            accelerator: 'CmdOrCtrl+T',
+            click: () => showTerminal(),
           },
           {
             label: 'Markdown Files Open In',
@@ -515,20 +688,12 @@ function install(ctx) {
     ];
     const menu = Menu.buildFromTemplate(template);
     Menu.setApplicationMenu(menu);
-    // Keep a handle on the skin checkbox so state loaded later or
-    // changed programmatically stays in sync with the menu.
-    for (const top of menu.items) {
-      if (top.label !== 'View' || !top.submenu) continue;
-      for (const item of top.submenu.items) {
-        if (item.label === 'Terminal Skin') skinMenuItem = item;
-      }
-    }
   }
   buildMenu();
 
   app.setAboutPanelOptions({
     applicationName: 'Muse (Academy Build)',
-    applicationVersion: ctx.buildLabel || '0.4.0-academy3',
+    applicationVersion: ctx.buildLabel || '0.4.0-academy5',
     version: '0.4.0',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +
@@ -539,8 +704,7 @@ function install(ctx) {
   return {
     gateWelcome: gateWelcome,
     showWelcome: () => showWelcome(),
-    setTerminalSkin: setTerminalSkin,
-    isTerminalSkin: () => terminalSkin,
+    showTerminal: showTerminal,
     getMarkdownRoute: () => markdownRoute,
     setMarkdownRoute: setMarkdownRoute,
     offerMarkdownDefault: offerMarkdownDefault,

@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Minion 0.4.1 verification.
+ * run-tests.cjs — Minion 0.4.2 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -257,7 +257,7 @@ ok('academy5: the terminal skin is deleted, not disabled', () => {
   assert.ok(/terminal-preload\.cjs/.test(expectedBlock[1]), 'terminal preload expected in the artifact');
 });
 
-ok('0.4.1: bundle identity is the Academy identifier', () => {
+ok('0.4.2: bundle identity is the Academy identifier', () => {
   // Owner revocation 2026-11-10 21:14 EST: the ai.muse.desktop
   // carve-out is gone; the line ships under its Academy identity.
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
@@ -281,7 +281,7 @@ ok('0.4.1: bundle identity is the Academy identifier', () => {
   }
 });
 
-ok('0.4.1: the app is named Minion on every shipped surface', () => {
+ok('0.4.2: the app is named Minion on every shipped surface', () => {
   // Owner rename 2026-11-10 21:49 EST: "rename academy muse to
   // minion." The bundle, the windows, the menu, the welcome and the
   // terminal all carry the one name; the upstream identity survives
@@ -289,6 +289,13 @@ ok('0.4.1: the app is named Minion on every shipped surface', () => {
   // credit), never as the product name.
   const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
   assert.ok(/label: 'About Minion'/.test(academy), 'About item is Minion');
+  // 0.4.2: the app menu's name is pinned display text. app.getName()
+  // returns the package identity, restored in 0.4.2 to its pre-rename
+  // plumbing value for sign-in continuity — it must never reach a
+  // surface through the menu template.
+  assert.ok(/label: 'Minion',/.test(academy), 'app menu name is pinned to Minion');
+  assert.ok(!/label: app\.getName\(\)/.test(academy),
+    'app menu name derives from the package identity');
   assert.ok(/title: 'Welcome — Minion'/.test(academy), 'welcome window titled Minion');
   assert.ok(/title: 'Terminal — Minion'/.test(academy), 'terminal window titled Minion');
   assert.ok(!/'Muse \(Academy Build\)'/.test(academy),
@@ -316,7 +323,7 @@ ok('0.4.1: the app is named Minion on every shipped surface', () => {
     'assembler stamps the Minion executable');
 });
 
-ok('0.4.1: app data stored separately, keyed to the bundle identity', () => {
+ok('0.4.2: app data stored separately, keyed to the bundle identity', () => {
   // Owner coding standard (J dir 2026-11-10 22:18 EST): the
   // app's data lives outside the bundle, in its own Application
   // Support location keyed to the bundle ID. Minion's store is
@@ -389,7 +396,7 @@ ok('academy5: terminal page is a self-contained shell surface', () => {
 
 ok('academy5: terminal wiring across main, academy, preload', () => {
   const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
-  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.1"/.test(main), 'build label is 0.4.1');
+  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.2"/.test(main), 'build label is 0.4.2');
   assert.ok(/__academyTerminal/.test(main), 'activate handler can tell the terminal window apart');
   const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
   assert.ok(/label: 'Terminal'/.test(academy), 'View menu carries the Terminal item');
@@ -458,7 +465,7 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
   assert.ok(/preload: ACADEMY_PRELOAD/.test(main), 'main window carries the preload');
   assert.ok(/preload: ACADEMY_PRELOAD,/.test(main.replace(/\s+/g, ' ')) || /preload: ACADEMY_PRELOAD/.test(main), 'popup carries the preload');
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
-  assert.strictEqual(pkg.version, '0.4.1');
+  assert.strictEqual(pkg.version, '0.4.2');
   assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.minion');
 });
 
@@ -897,7 +904,7 @@ async function terminalBehaviorGroups() {
         removeListener: () => {},
       },
       nativeTheme: { themeSource: 'system' },
-      buildLabel: '0.4.1',
+      buildLabel: '0.4.2',
     };
     const layer = academy.install(ctx);
 
@@ -1002,7 +1009,7 @@ async function terminalBehaviorGroups() {
         handle: () => {}, on: () => {}, removeListener: () => {},
       },
       nativeTheme: { themeSource: 'system' },
-      buildLabel: '0.4.1',
+      buildLabel: '0.4.2',
     };
     const layer2 = academy2.install(ctx2);
     assert.strictEqual(ctx2.nativeTheme.themeSource, 'light',
@@ -1011,7 +1018,7 @@ async function terminalBehaviorGroups() {
 
     // Build info is the runtime plist version for the terminal only.
     assert.deepStrictEqual(await info({ sender: termWin.webContents }),
-      { name: 'Minion', version: '0.4.0', build: '0.4.1' });
+      { name: 'Minion', version: '0.4.0', build: '0.4.2' });
     assert.strictEqual(await info({ sender: hostWin.webContents }), null);
   });
 }
@@ -1020,21 +1027,65 @@ markdownRouterGroups()
   .then(markdownDefaultGroups)
   .then(terminalBehaviorGroups)
   .then(() => {
-    ok('0.4.1: obliteration census — no muse naming survives in the shipped layer', () => {
+ok('0.4.2: auth continuity — the session store and the package identity keep their pre-rename plumbing identities', () => {
+  // 0.4.2 repair (Distro files/32). Owner symptom on 0.4.1: sign-in
+  // spun forever after the 2FA step, while 0.4.0-minion3 signed in
+  // normally on the same machine and account. The 0.4.1 rename pass
+  // had renamed two plumbing identities along with the display name:
+  // (1) the session partition — the session store's identity; the
+  // renamed store orphaned the existing signed-in session; and
+  // (2) the package.json name, from which the app identity the
+  // session machinery derives (the user-agent token and the macOS
+  // Safe Storage keychain service, app name + " Safe Storage") is
+  // taken — so the fresh sign-in's post-auth session step ran under
+  // an identity no stored credential belonged to and never
+  // resolved. Both are restored here. Neither is displayed: the
+  // display is the bundle name, the pinned window title, the menu
+  // and the About panel, all Minion (asserted above).
+  const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
+  const sites = main.match(/"persist:muse"/g) || [];
+  assert.strictEqual(sites.length, 3,
+    'all three partition sites (main window, sign-in popup, session configuration) use the pre-rename session store');
+  assert.ok(!/"persist:minion"/.test(main),
+    'the 0.4.1 renamed session store survives as a code site in main.cjs');
+  const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
+  assert.strictEqual(pkg.name, 'muse-desktop',
+    'package identity is the pre-rename plumbing identity');
+  assert.strictEqual(pkg.build.productName, 'Minion',
+    'product name (display) stays Minion');
+});
+
+    ok('0.4.2: obliteration census — no muse naming survives in the shipped layer outside the endpoint constants and the recorded plumbing exceptions', () => {
   // Owner ruling 2026-11-11 13:14 EST: a rename is total. Every
   // line in the shipped Academy layer that still matches /muse/i
   // must be an API endpoint constant (the muse.ai address the app
-  // calls — plumbing, never a name, brand, or display element).
+  // calls — plumbing, never a name, brand, or display element) —
+  // or one of the two plumbing-identity exceptions recorded for
+  // the 0.4.2 sign-in repair (Distro files/32), in the same class
+  // as the endpoint constant: identifiers the session machinery
+  // keys on, displayed nowhere. The exceptions are exact: the
+  // session partition literal in main.cjs, and the package
+  // identity in package.json. Any other muse naming fails.
   const shipped = [];
   for (const f of fs.readdirSync(ELE)) shipped.push(path.join(ELE, f));
   shipped.push(path.join(APP, 'package.json'));
   shipped.push(path.join(APP, '..', 'assets', 'INSTALL.txt'));
   shipped.push(path.join(APP, '..', 'tools', 'assemble.py'));
+  const plumbingException = (file, line) => {
+    if (path.basename(file) === 'main.cjs') {
+      return /partition: "persist:muse"/.test(line) ||
+        /fromPartition\("persist:muse"\)/.test(line);
+    }
+    if (path.basename(file) === 'package.json') {
+      return /"name": "muse-desktop"/.test(line);
+    }
+    return false;
+  };
   for (const f of shipped) {
     const lines = fs.readFileSync(f, 'utf8').split('\n');
     lines.forEach((line, i) => {
       if (/muse/i.test(line)) {
-        assert.ok(/muse\.ai/.test(line),
+        assert.ok(/muse\.ai/.test(line) || plumbingException(f, line),
           'non-endpoint muse naming survives at ' + path.basename(f) + ':' + (i + 1) + ': ' + line.trim());
       }
     });

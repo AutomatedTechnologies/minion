@@ -1,4 +1,4 @@
-Minion 0.4.1 — for High Sierra, Intel (x64)
+Minion 0.4.2 — for High Sierra, Intel (x64)
 ====================================================
 
 What this is
@@ -16,15 +16,21 @@ Minion is the app's name on every surface — bundle Minion.app under
 the Academy bundle identity com.detroitautomationacademy.minion,
 with the Minion mark: the scheming side-eye dog, rendered to the
 Academy monochrome standard (white tile, ink artwork, no black
-field). Version 0.4.1 is identified by version alone.
+field). Version 0.4.2 is identified by version alone.
 
-New in 0.4.1: the rename is total. Every naming string carried over
-from the app's earlier identity has been renamed in this build —
-the load-failure dialog, the Terminal view's messages, the stored
-history keys, and the session partition all read Minion. Because
-the session partition and the history keys are renamed, this build
-signs in fresh and starts with empty message recall; nothing is
-migrated. The window title bar reads Minion (the hosted page's own
+New in 0.4.2: sign-in is repaired. The 0.4.1 build renamed two
+plumbing identities along with the app's display name — the
+session partition (the session store's identity) and the package
+identity the session machinery derives from — and sign-in broke:
+an existing sign-in was left behind, and a fresh sign-in spun
+forever after the two-factor step. This build restores both
+plumbing identities to the values the working builds used, so a
+sign-in made in an earlier build carries into this one and a
+fresh sign-in completes. (A sign-in made inside 0.4.1's own
+separate session store is not read here; if 0.4.1 was the only
+build you ran, sign in once more.) Nothing about the app's name
+or surfaces changes. The window title bar reads Minion (the
+hosted page's own
 title never replaces the app's name in the title bar), and the app
 presents DARK by default: a fresh profile opens dark. Dark is the
 default, not a lock — View menu → Appearance (Dark / Light /

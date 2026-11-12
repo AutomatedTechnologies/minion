@@ -11,7 +11,7 @@ const {
   isEndpointOrigin,
   uniqueDownloadPath,
 } = require("./utils.cjs");
-// Minion 0.4.1: feature layer + window-management
+// Minion 0.4.2: feature layer + window-management
 // repair (owner escalation 2026-11-10; defect register in files/19).
 // academy.cjs: sent-message history, terminal view (academy5; the
 // terminal skin it replaced is deleted), SDS-8 welcome, application
@@ -36,7 +36,7 @@ const {
   placementFor,
 } = require("./window-state.cjs");
 
-const ACADEMY_BUILD_LABEL = "0.4.1";
+const ACADEMY_BUILD_LABEL = "0.4.2";
 const ACADEMY_PRELOAD = path.join(__dirname, "preload.cjs");
 
 // Set by start() once the feature layer is installed; window
@@ -343,7 +343,7 @@ function configureWindowNavigation(window, isPopup = false) {
           nodeIntegrationInSubFrames: false,
           sandbox: true,
           webSecurity: true,
-          partition: "persist:minion",
+          partition: "persist:muse",
           // Academy build: the feature preload (history + terminal
           // bridge) applies to popup windows on the API endpoint origin
           // too.
@@ -401,7 +401,7 @@ function createMinionWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      partition: "persist:minion",
+      partition: "persist:muse",
       // Academy build: feature preload (history + terminal bridge).
       preload: ACADEMY_PRELOAD,
     },
@@ -492,7 +492,18 @@ function start() {
   app.setPath("userData", path.join(app.getPath("appData"), "com.detroitautomationacademy.minion"));
 
   app.whenReady().then(() => {
-    configureSession(session.fromPartition("persist:minion"));
+    // 0.4.2 auth-continuity repair (Distro files/32): the session
+    // partition name is the session store's identity, not a display
+    // string. The 0.4.1 rename pass renamed it and broke sign-in:
+    // the renamed store orphaned
+    // the existing signed-in session, and a fresh sign-in in the
+    // renamed store spun forever after the 2FA step (owner report,
+    // 2026-11-11). The partition name is plumbing in the same class
+    // as the API endpoint constant — no surface displays it — so it
+    // keeps the identity the working builds used. Display is owned
+    // by the bundle name, the pinned window title, and the menu,
+    // all Minion.
+    configureSession(session.fromPartition("persist:muse"));
     // Academy build: install the feature layer, then the SDS-8
     // welcome gate decides whether the service window opens now or
     // after the owner's Continue (first launch only).

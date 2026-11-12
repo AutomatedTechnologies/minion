@@ -1,6 +1,6 @@
 'use strict';
 /*
- * academy.cjs — Minion 0.4.1, main process.
+ * academy.cjs — Minion 0.4.2, main process.
  *
  * The Academy feature layer over the upstream shell:
  *  - Sent-message history (history.cjs): persisted per conversation
@@ -613,7 +613,11 @@ function install(ctx) {
   function buildMenu() {
     const template = [
       {
-        label: app.getName(),
+        // 0.4.2: the menu's name is display and stays Minion.
+        // app.getName() returns the package identity, which 0.4.2
+        // restored to its pre-rename plumbing value for sign-in
+        // continuity (Distro files/32) — it is never displayed.
+        label: 'Minion',
         submenu: [
           {
             role: 'about',
@@ -767,8 +771,8 @@ function install(ctx) {
 
   app.setAboutPanelOptions({
     applicationName: 'Minion',
-    applicationVersion: ctx.buildLabel || '0.4.1',
-    version: '0.4.1',
+    applicationVersion: ctx.buildLabel || '0.4.2',
+    version: '0.4.2',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +
       'The application layer is MIT-licensed open source; the license ' +

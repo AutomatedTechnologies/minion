@@ -13,7 +13,7 @@ Packaged by **Detroit Automation Academy** for distribution through
 **Distro**, the Academy's High Sierra app store.
 
 - Bundle: `Minion.app` — bundle id
-  `com.detroitautomationacademy.minion`, version **0.4.1**,
+  `com.detroitautomationacademy.minion`, version **0.4.2**,
   identified by version alone.
 - Icon: the Minion mark (the scheming side-eye dog) in the Academy
   monochrome standard rendition — white tile, ink artwork, no

@@ -1,4 +1,4 @@
-Minion 0.4.2 — for High Sierra, Intel (x64)
+Minion 0.4.3 — for High Sierra, Intel (x64)
 ====================================================
 
 What this is
@@ -16,9 +16,18 @@ Minion is the app's name on every surface — bundle Minion.app under
 the Academy bundle identity com.detroitautomationacademy.minion,
 with the Minion mark: the scheming side-eye dog, rendered to the
 Academy monochrome standard (white tile, ink artwork, no black
-field). Version 0.4.2 is identified by version alone.
+field). Version 0.4.3 is identified by version alone.
 
-New in 0.4.2: sign-in is repaired. The 0.4.1 build renamed two
+New in 0.4.3: the avatar no longer burns the machine while you
+are not looking at it. Earlier builds let the hosted page's
+looping avatar animation decode and composite at full rate
+forever — measured at roughly half of the Air's CPU with the app
+simply open. This build pauses that animation whenever the
+window is hidden or not frontmost, and after 45 seconds idle on
+screen, and resumes it the moment you click, type, or a reply
+starts streaming. While you are working in the app the avatar
+animates exactly as before. Everything in 0.4.2 stands, including
+the sign-in repair: sign-in is repaired. The 0.4.1 build renamed two
 plumbing identities along with the app's display name — the
 session partition (the session store's identity) and the package
 identity the session machinery derives from — and sign-in broke:

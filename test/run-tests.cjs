@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Minion 0.4.2 verification.
+ * run-tests.cjs — Minion 0.4.3 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -20,6 +20,11 @@
  *     against the page's title updates; the appearance defaults
  *     to dark through nativeTheme, persists the owner's explicit
  *     choice, and never stomps it on a later launch.
+ *  8. 0.4.3: the avatar governor state machine (hidden /
+ *     unfocused / idle pause, single-fire transitions, stacked
+ *     reasons), its byte-identical preload mirror, and the
+ *     wiring that applies it (preload adapter, explicit
+ *     backgroundThrottling on every window).
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -36,10 +41,10 @@ function ok(name, fn) {
 }
 
 // 0. Syntax: every shipped script parses.
-for (const f of ['main.cjs', 'utils.cjs', 'academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'terminal-preload.cjs', 'window-law.cjs', 'window-state.cjs', 'md-classify.cjs', 'md-route.cjs']) {
+for (const f of ['main.cjs', 'utils.cjs', 'academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'terminal-preload.cjs', 'window-law.cjs', 'window-state.cjs', 'md-classify.cjs', 'md-route.cjs', 'avatar-governor.cjs']) {
   execFileSync(process.execPath, ['--check', path.join(ELE, f)]);
 }
-ok('node --check clean on all 11 app-layer scripts', () => {});
+ok('node --check clean on all 12 app-layer scripts', () => {});
 
 const ws = require(path.join(ELE, 'window-state.cjs'));
 const AIR = { x: 0, y: 23, width: 1440, height: 877 }; // 13" Air work area
@@ -257,7 +262,7 @@ ok('academy5: the terminal skin is deleted, not disabled', () => {
   assert.ok(/terminal-preload\.cjs/.test(expectedBlock[1]), 'terminal preload expected in the artifact');
 });
 
-ok('0.4.2: bundle identity is the Academy identifier', () => {
+ok('0.4.3: bundle identity is the Academy identifier', () => {
   // Owner revocation 2026-11-10 21:14 EST: the ai.muse.desktop
   // carve-out is gone; the line ships under its Academy identity.
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
@@ -281,7 +286,7 @@ ok('0.4.2: bundle identity is the Academy identifier', () => {
   }
 });
 
-ok('0.4.2: the app is named Minion on every shipped surface', () => {
+ok('0.4.3: the app is named Minion on every shipped surface', () => {
   // Owner rename 2026-11-10 21:49 EST: "rename academy muse to
   // minion." The bundle, the windows, the menu, the welcome and the
   // terminal all carry the one name; the upstream identity survives
@@ -323,7 +328,7 @@ ok('0.4.2: the app is named Minion on every shipped surface', () => {
     'assembler stamps the Minion executable');
 });
 
-ok('0.4.2: app data stored separately, keyed to the bundle identity', () => {
+ok('0.4.3: app data stored separately, keyed to the bundle identity', () => {
   // Owner coding standard (J dir 2026-11-10 22:18 EST): the
   // app's data lives outside the bundle, in its own Application
   // Support location keyed to the bundle ID. Minion's store is
@@ -396,7 +401,7 @@ ok('academy5: terminal page is a self-contained shell surface', () => {
 
 ok('academy5: terminal wiring across main, academy, preload', () => {
   const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
-  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.2"/.test(main), 'build label is 0.4.2');
+  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.3"/.test(main), 'build label is 0.4.3');
   assert.ok(/__academyTerminal/.test(main), 'activate handler can tell the terminal window apart');
   const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
   assert.ok(/label: 'Terminal'/.test(academy), 'View menu carries the Terminal item');
@@ -446,7 +451,7 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
     /\.at\(-/, /structuredClone/, /replaceAll\(/, /findLast\(/,
     /Object\.hasOwn/, /top-level await/, /\busing\s+\w+\s*=/,
   ];
-  for (const f of ['academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'terminal-preload.cjs', 'md-classify.cjs', 'md-route.cjs']) {
+  for (const f of ['academy.cjs', 'history.cjs', 'preload.cjs', 'welcome-preload.cjs', 'terminal-preload.cjs', 'md-classify.cjs', 'md-route.cjs', 'avatar-governor.cjs']) {
     const text = fs.readFileSync(path.join(ELE, f), 'utf8');
     for (const pattern of banned) {
       assert.ok(!pattern.test(text), f + ' uses banned ' + pattern);
@@ -465,7 +470,7 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
   assert.ok(/preload: ACADEMY_PRELOAD/.test(main), 'main window carries the preload');
   assert.ok(/preload: ACADEMY_PRELOAD,/.test(main.replace(/\s+/g, ' ')) || /preload: ACADEMY_PRELOAD/.test(main), 'popup carries the preload');
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
-  assert.strictEqual(pkg.version, '0.4.2');
+  assert.strictEqual(pkg.version, '0.4.3');
   assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.minion');
 });
 
@@ -904,7 +909,7 @@ async function terminalBehaviorGroups() {
         removeListener: () => {},
       },
       nativeTheme: { themeSource: 'system' },
-      buildLabel: '0.4.2',
+      buildLabel: '0.4.3',
     };
     const layer = academy.install(ctx);
 
@@ -1009,7 +1014,7 @@ async function terminalBehaviorGroups() {
         handle: () => {}, on: () => {}, removeListener: () => {},
       },
       nativeTheme: { themeSource: 'system' },
-      buildLabel: '0.4.2',
+      buildLabel: '0.4.3',
     };
     const layer2 = academy2.install(ctx2);
     assert.strictEqual(ctx2.nativeTheme.themeSource, 'light',
@@ -1018,10 +1023,92 @@ async function terminalBehaviorGroups() {
 
     // Build info is the runtime plist version for the terminal only.
     assert.deepStrictEqual(await info({ sender: termWin.webContents }),
-      { name: 'Minion', version: '0.4.0', build: '0.4.2' });
+      { name: 'Minion', version: '0.4.0', build: '0.4.3' });
     assert.strictEqual(await info({ sender: hostWin.webContents }), null);
   });
 }
+
+// ---- Avatar governor (0.4.3, Distro files/39; estate review ER-15) ----
+
+const { createAvatarGovernor, AVATAR_GOVERNOR_IDLE_MS } = require(path.join(ELE, 'avatar-governor.cjs'));
+
+function governorRig() {
+  const calls = [];
+  const governor = createAvatarGovernor({
+    onPause: (reason) => calls.push(['pause', reason]),
+    onResume: () => calls.push(['resume']),
+  });
+  return { governor, calls };
+}
+
+ok('0.4.3 avatar governor: hidden pauses, visible resumes, callbacks fire once per transition', () => {
+  const { governor, calls } = governorRig();
+  assert.strictEqual(AVATAR_GOVERNOR_IDLE_MS, 45000);
+  assert.strictEqual(governor.start(0), null);
+  assert.strictEqual(governor.setHidden(true, 1000), 'hidden');
+  assert.strictEqual(governor.poll(2000), 'hidden');
+  assert.strictEqual(governor.setHidden(false, 3000), null);
+  assert.deepStrictEqual(calls, [['pause', 'hidden'], ['resume']]);
+});
+
+ok('0.4.3 avatar governor: unfocused pauses; regaining focus resumes and restarts the idle window', () => {
+  const { governor, calls } = governorRig();
+  governor.start(0);
+  assert.strictEqual(governor.setFocused(false, 5000), 'unfocused');
+  assert.strictEqual(governor.setFocused(true, 60000), null);
+  assert.strictEqual(governor.poll(60000 + 44999), null, 'focus return restarts the idle window');
+  assert.deepStrictEqual(calls, [['pause', 'unfocused'], ['resume']]);
+});
+
+ok('0.4.3 avatar governor: idle pauses at the window edge; activity resumes and re-arms', () => {
+  const { governor, calls } = governorRig();
+  governor.start(1000);
+  assert.strictEqual(governor.poll(1000 + 44999), null);
+  assert.strictEqual(governor.poll(1000 + 45000), 'idle');
+  assert.strictEqual(governor.activity(1000 + 46000), null, 'owner input resumes');
+  assert.strictEqual(governor.poll(1000 + 46000 + 45000), 'idle', 'idle re-arms after activity');
+  assert.deepStrictEqual(calls, [['pause', 'idle'], ['resume'], ['pause', 'idle']]);
+});
+
+ok('0.4.3 avatar governor: stacked reasons — focus returning while hidden does not resume', () => {
+  const { governor, calls } = governorRig();
+  governor.start(0);
+  assert.strictEqual(governor.setHidden(true, 100), 'hidden');
+  assert.strictEqual(governor.setFocused(false, 200), 'hidden');
+  assert.strictEqual(governor.setHidden(false, 300), 'unfocused', 'the softer reason surfaces, still paused');
+  assert.strictEqual(governor.setFocused(true, 400), null);
+  assert.deepStrictEqual(calls, [['pause', 'hidden'], ['resume']]);
+});
+
+ok('preload avatar-governor mirror is identical to the avatar-governor.cjs block', () => {
+  const extract = (file) => {
+    const text = fs.readFileSync(file, 'utf8');
+    const m = text.match(/\/\/ BEGIN avatar-governor\n([\s\S]*?)\/\/ END avatar-governor/);
+    assert.ok(m, 'markers present in ' + file);
+    return m[1];
+  };
+  assert.strictEqual(
+    extract(path.join(ELE, 'preload.cjs')),
+    extract(path.join(ELE, 'avatar-governor.cjs'))
+  );
+});
+
+ok('0.4.3 avatar governor: wiring — preload adapter applies pause/resume; throttling explicit on every window', () => {
+  const preload = fs.readFileSync(path.join(ELE, 'preload.cjs'), 'utf8');
+  assert.ok(/function installAvatarGovernor\(\)/.test(preload), 'adapter present');
+  assert.ok(/academy-avatar-governor/.test(preload), 'pause stylesheet id present');
+  assert.ok(/animation-play-state: paused/.test(preload), 'CSS animations held while paused');
+  assert.ok(/querySelectorAll\('video'\)/.test(preload), 'video elements paused while paused');
+  assert.ok(/installAvatarGovernor\(\)/.test(preload.slice(preload.lastIndexOf('try {'))), 'adapter installed at boot');
+  const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
+  assert.strictEqual((main.match(/backgroundThrottling: true/g) || []).length, 2,
+    'main window + sign-in popup state background throttling explicitly');
+  const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
+  assert.strictEqual((academy.match(/backgroundThrottling: true/g) || []).length, 2,
+    'terminal + welcome windows state background throttling explicitly');
+  const welcome = fs.readFileSync(path.join(ELE, 'welcome.html'), 'utf8');
+  assert.ok(/animationPlayState/.test(welcome), 'welcome mark pulse holds while hidden');
+});
 
 markdownRouterGroups()
   .then(markdownDefaultGroups)

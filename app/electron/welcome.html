@@ -76,6 +76,13 @@
 </div>
 <audio autoplay preload="auto" src="startup-sound.wav"></audio>
 <script>
+  // 0.4.3 (files/39): the mark's pulse is the welcome's only
+  // animation; hold it while the window's page is hidden instead
+  // of compositing an unseen loop.
+  document.addEventListener('visibilitychange', function () {
+    var mark = document.querySelector('.mark');
+    if (mark) mark.style.animationPlayState = document.hidden ? 'paused' : 'running';
+  });
   // Version from the runtime bridge (main process reads it from the
   // bundle's Info.plist). No bridge: the line simply stays unadorned.
   try {

@@ -1,6 +1,6 @@
 'use strict';
 /*
- * academy.cjs — Minion 0.4.2, main process.
+ * academy.cjs — Minion 0.4.3, main process.
  *
  * The Academy feature layer over the upstream shell:
  *  - Sent-message history (history.cjs): persisted per conversation
@@ -395,6 +395,7 @@ function install(ctx) {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
+        backgroundThrottling: true,
         preload: path.join(__dirname, 'terminal-preload.cjs'),
       },
     });
@@ -563,6 +564,7 @@ function install(ctx) {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
+        backgroundThrottling: true,
         preload: path.join(__dirname, 'welcome-preload.cjs'),
       },
     });
@@ -771,8 +773,8 @@ function install(ctx) {
 
   app.setAboutPanelOptions({
     applicationName: 'Minion',
-    applicationVersion: ctx.buildLabel || '0.4.2',
-    version: '0.4.2',
+    applicationVersion: ctx.buildLabel || '0.4.3',
+    version: '0.4.3',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +
       'The application layer is MIT-licensed open source; the license ' +

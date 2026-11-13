@@ -1,6 +1,6 @@
 'use strict';
 /*
- * preload.cjs — Minion 0.4.1.
+ * preload.cjs — Minion 0.4.3.
  *
  * Injected into the hosted pages (main window + popups) by
  * the patched main.cjs. Sandboxed: the only module available is
@@ -38,6 +38,16 @@
  *     the bridge's observation surface, but carries no class.
  *     Enter sends / Shift+Enter newline is the composer's own
  *     behavior and is not overridden.
+ *  3. Avatar governor (0.4.3, Distro files/39; estate review
+ *     ER-15): the hosted page's continuously looping avatar
+ *     animation is paused — CSS animations held, videos paused —
+ *     whenever the page is hidden, the window is not frontmost, or
+ *     the app sits idle (45 s without owner input or page content
+ *     activity), and resumed instantly on any signal of use.
+ *     Appearance while the owner is working is unchanged; the
+ *     sustained decode/composite cost of an unseen or idle loop
+ *     is removed by construction. Decision core in
+ *     avatar-governor.cjs, mirrored below between the markers.
  */
 
 var ipcRenderer = null;
@@ -100,6 +110,176 @@ function createNavigator(entries) {
   };
 }
 // END history-nav
+
+// BEGIN avatar-governor
+var AVATAR_GOVERNOR_IDLE_MS = 45000;
+
+function createAvatarGovernor(options) {
+  var idleMs = (options && options.idleMs) || AVATAR_GOVERNOR_IDLE_MS;
+  var onPause = (options && options.onPause) || function () {};
+  var onResume = (options && options.onResume) || function () {};
+  var hidden = false;
+  var focused = true;
+  var startedAt = 0;
+  var lastActivityAt = 0;
+  var pausedReason = null; // null | 'hidden' | 'unfocused' | 'idle'
+
+  function reasonAt(now) {
+    if (hidden) return 'hidden';
+    if (!focused) return 'unfocused';
+    var since = lastActivityAt || startedAt;
+    if (now - since >= idleMs) return 'idle';
+    return null;
+  }
+
+  function evaluate(now) {
+    var reason = reasonAt(now);
+    if (reason && !pausedReason) {
+      pausedReason = reason;
+      onPause(reason);
+    } else if (!reason && pausedReason) {
+      pausedReason = null;
+      onResume();
+    } else if (reason && reason !== pausedReason) {
+      // Still paused, harder reason: track it so a partial signal
+      // change (e.g. focus returns while hidden) cannot resume.
+      pausedReason = reason;
+    }
+    return pausedReason;
+  }
+
+  return {
+    start: function (now) {
+      startedAt = now;
+      lastActivityAt = now;
+      return evaluate(now);
+    },
+    setHidden: function (value, now) {
+      hidden = !!value;
+      // Becoming visible restarts the idle window: the owner just
+      // brought the app forward, which is itself use.
+      if (!hidden) lastActivityAt = now;
+      return evaluate(now);
+    },
+    setFocused: function (value, now) {
+      focused = !!value;
+      if (focused) lastActivityAt = now;
+      return evaluate(now);
+    },
+    activity: function (now) {
+      lastActivityAt = now;
+      return evaluate(now);
+    },
+    poll: function (now) {
+      return evaluate(now);
+    },
+    reason: function () {
+      return pausedReason;
+    },
+    isPaused: function () {
+      return !!pausedReason;
+    },
+  };
+}
+// END avatar-governor
+
+// ---- Avatar governor adapter (0.4.3, Distro files/39) ----
+// Feeds the governor above the page's signals and applies its
+// verdicts. Pause = an injected stylesheet holds every CSS
+// animation at its current frame, and every playing <video> is
+// paused (the hosted avatar's loop is a video element; Chromium's
+// background throttling alone never stops media decode). Resume
+// removes the stylesheet and replays ONLY the videos this adapter
+// paused — a video the owner paused is never restarted. While
+// paused, a 1 s sweep re-pauses videos the page starts later.
+// Content activity = DOM mutations (a streaming reply mutates the
+// stream continuously); the governor's own stylesheet and <video>
+// insertions do not count, and CSS/video animation itself produces
+// no mutations — on an idle chat view the avatar loop is the only
+// animator, so the idle gate engages on exactly the measured load.
+function installAvatarGovernor() {
+  var styleEl = null;
+  var pausedVideos = [];
+  var governor = createAvatarGovernor({
+    onPause: function () { applyPause(); },
+    onResume: function () { applyResume(); },
+  });
+
+  function applyPause() {
+    try {
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'academy-avatar-governor';
+        styleEl.textContent = '* { animation-play-state: paused !important; }';
+      }
+      if (document.head && !styleEl.parentNode) document.head.appendChild(styleEl);
+      sweepVideos();
+    } catch (error) { /* cosmetics only — never break the page */ }
+  }
+
+  function sweepVideos() {
+    try {
+      var videos = document.querySelectorAll('video');
+      for (var i = 0; i < videos.length; i++) {
+        var v = videos[i];
+        if (!v.paused && pausedVideos.indexOf(v) === -1) {
+          pausedVideos.push(v);
+          try { v.pause(); } catch (error) { /* noop */ }
+        }
+      }
+    } catch (error) { /* noop */ }
+  }
+
+  function applyResume() {
+    try {
+      if (styleEl && styleEl.parentNode) styleEl.parentNode.removeChild(styleEl);
+      var resume = pausedVideos;
+      pausedVideos = [];
+      for (var i = 0; i < resume.length; i++) {
+        try {
+          var played = resume[i].play();
+          if (played && played.catch) played.catch(function () {});
+        } catch (error) { /* noop */ }
+      }
+    } catch (error) { /* noop */ }
+  }
+
+  function now() { return Date.now(); }
+
+  document.addEventListener('visibilitychange', function () {
+    governor.setHidden(document.hidden, now());
+  });
+  window.addEventListener('blur', function () { governor.setFocused(false, now()); });
+  window.addEventListener('focus', function () { governor.setFocused(true, now()); });
+  var activityEvents = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+  for (var i = 0; i < activityEvents.length; i++) {
+    window.addEventListener(activityEvents[i], function () { governor.activity(now()); }, true);
+  }
+  try {
+    var observer = new window.MutationObserver(function (mutations) {
+      for (var i = 0; i < mutations.length; i++) {
+        var m = mutations[i];
+        if (m.target === styleEl) continue;
+        var nodes = m.addedNodes;
+        var onlyMedia = nodes.length > 0;
+        for (var j = 0; j < nodes.length; j++) {
+          if (nodes[j] !== styleEl && nodes[j].nodeName !== 'VIDEO') onlyMedia = false;
+        }
+        if (onlyMedia && m.type === 'childList') continue;
+        governor.activity(now());
+        return;
+      }
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  } catch (error) { /* content activity is a refinement, not a requirement */ }
+
+  governor.setHidden(!!document.hidden, now());
+  governor.start(now());
+  window.setInterval(function () {
+    governor.poll(now());
+    if (governor.isPaused()) sweepVideos();
+  }, 1000);
+}
 
 function conversationKey() {
   try {
@@ -537,8 +717,12 @@ function init() {
 
 try {
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { try { init(); } catch (error) { /* noop */ } });
+    document.addEventListener('DOMContentLoaded', function () {
+      try { init(); } catch (error) { /* noop */ }
+      try { installAvatarGovernor(); } catch (error) { /* noop */ }
+    });
   } else {
     init();
+    try { installAvatarGovernor(); } catch (error) { /* noop */ }
   }
 } catch (error) { /* the hosted page must never see a preload failure */ }

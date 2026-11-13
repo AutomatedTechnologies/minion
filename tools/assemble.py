@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble Minion-1013-x64.zip — Minion 0.4.2.
+"""Assemble Minion-1013-x64.zip — Minion 0.4.3.
 
 Construction of record (Distro files/06): the official Electron
 v22.3.27 darwin-x64 distribution (SHA-256 pinned below — a mismatch
@@ -35,7 +35,7 @@ import tempfile
 import zipfile
 
 DIST_SHA256 = "01f053d08cb2855acb14f0465f4e36324a41bd13b3b2ead142970a56df3e9db1"
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 AUDIT = {
     "Disassembled": True,
     "Scanned": True,
@@ -70,6 +70,7 @@ EXPECTED_APP_FILES = [
     "electron/md-classify.cjs",
     "electron/md-route.cjs",
     "electron/history.cjs",
+    "electron/avatar-governor.cjs",
     "electron/window-law.cjs",
     "electron/window-state.cjs",
     "electron/preload.cjs",

@@ -11,7 +11,7 @@ const {
   isEndpointOrigin,
   uniqueDownloadPath,
 } = require("./utils.cjs");
-// Minion 0.4.2: feature layer + window-management
+// Minion 0.4.3: feature layer + window-management
 // repair (owner escalation 2026-11-10; defect register in files/19).
 // academy.cjs: sent-message history, terminal view (academy5; the
 // terminal skin it replaced is deleted), SDS-8 welcome, application
@@ -36,7 +36,7 @@ const {
   placementFor,
 } = require("./window-state.cjs");
 
-const ACADEMY_BUILD_LABEL = "0.4.2";
+const ACADEMY_BUILD_LABEL = "0.4.3";
 const ACADEMY_PRELOAD = path.join(__dirname, "preload.cjs");
 
 // Set by start() once the feature layer is installed; window
@@ -344,6 +344,9 @@ function configureWindowNavigation(window, isPopup = false) {
           sandbox: true,
           webSecurity: true,
           partition: "persist:muse",
+          // 0.4.3 (files/39): throttling stated, not inherited —
+          // see the main window's note below.
+          backgroundThrottling: true,
           // Academy build: the feature preload (history + terminal
           // bridge) applies to popup windows on the API endpoint origin
           // too.
@@ -402,6 +405,16 @@ function createMinionWindow() {
       nodeIntegration: false,
       sandbox: true,
       partition: "persist:muse",
+      // 0.4.3 performance fix (Distro files/39; ER-15): background
+      // throttling is explicit on every hosted window. It was the
+      // Chromium default before and stays on — stated here because
+      // the avatar governor in the preload (avatar-governor.cjs)
+      // is the other half of the fix: throttling slows timers and
+      // rAF in a backgrounded page but never stops media decode,
+      // so the governor pauses the hosted page's looping avatar
+      // animation outright when the page is hidden, the window is
+      // not frontmost, or the app sits idle.
+      backgroundThrottling: true,
       // Academy build: feature preload (history + terminal bridge).
       preload: ACADEMY_PRELOAD,
     },

@@ -1,6 +1,6 @@
 'use strict';
 /*
- * academy.cjs — Minion 0.4.3, main process.
+ * academy.cjs — Minion 0.4.4, main process.
  *
  * The Academy feature layer over the upstream shell:
  *  - Sent-message history (history.cjs): persisted per conversation
@@ -619,6 +619,14 @@ function install(ctx) {
         // app.getName() returns the package identity, which 0.4.2
         // restored to its pre-rename plumbing value for sign-in
         // continuity (Distro files/32) — it is never displayed.
+        // 0.4.4: the hide/quit role items below carry explicit
+        // labels for the same reason. Left bare, Electron generates
+        // a role item's label from app.getName() — the plumbing
+        // package identity — which is how that value reached this
+        // menu in 0.4.3 (owner screenshot 2026-11-14; teardown
+        // finding M-13). The plumbing value itself does not move:
+        // the session machinery keys on it (files/32, mechanism
+        // M2), so the labels are pinned here instead.
         label: 'Minion',
         submenu: [
           {
@@ -632,11 +640,11 @@ function install(ctx) {
           { type: 'separator' },
           { role: 'services' },
           { type: 'separator' },
-          { role: 'hide' },
+          { role: 'hide', label: 'Hide Minion' },
           { role: 'hideOthers' },
           { role: 'unhide' },
           { type: 'separator' },
-          { role: 'quit' },
+          { role: 'quit', label: 'Quit Minion' },
         ],
       },
       {
@@ -773,8 +781,8 @@ function install(ctx) {
 
   app.setAboutPanelOptions({
     applicationName: 'Minion',
-    applicationVersion: ctx.buildLabel || '0.4.3',
-    version: '0.4.3',
+    applicationVersion: ctx.buildLabel || '0.4.4',
+    version: '0.4.4',
     copyright:
       'Unofficial build: not a Meta product and not endorsed by Meta. ' +
       'The application layer is MIT-licensed open source; the license ' +

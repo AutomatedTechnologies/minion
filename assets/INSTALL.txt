@@ -1,4 +1,4 @@
-Minion 0.4.3 — for High Sierra, Intel (x64)
+Minion 0.4.4 — for High Sierra, Intel (x64)
 ====================================================
 
 What this is
@@ -16,7 +16,18 @@ Minion is the app's name on every surface — bundle Minion.app under
 the Academy bundle identity com.detroitautomationacademy.minion,
 with the Minion mark: the scheming side-eye dog, rendered to the
 Academy monochrome standard (white tile, ink artwork, no black
-field). Version 0.4.3 is identified by version alone.
+field). Version 0.4.4 is identified by version alone.
+
+New in 0.4.4: the application menu now reads Minion all the way
+down. In earlier builds the Hide and Quit items at the bottom of
+the Minion menu carried the app's internal package identifier
+instead of its name — a leftover surface the 0.4.2 rename pass
+pinned everywhere except the two menu items whose labels the
+system generates. Those labels are now pinned to "Hide Minion"
+and "Quit Minion" in the menu itself. Nothing else changes: the
+internal identifier the sign-in machinery keys on is untouched,
+so a sign-in made in an earlier build carries into this one
+exactly as it did into 0.4.3.
 
 New in 0.4.3: the avatar no longer burns the machine while you
 are not looking at it. Earlier builds let the hosted page's

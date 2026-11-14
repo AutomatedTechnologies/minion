@@ -1,6 +1,6 @@
 'use strict';
 /*
- * run-tests.cjs — Minion 0.4.3 verification.
+ * run-tests.cjs — Minion 0.4.4 verification.
  * Plain Node (>= the Electron 22 runtime's Node 16 semantics; runs on
  * any modern Node). Covers:
  *  1. history.cjs store: add/dedupe/caps/isolation/persistence/evict.
@@ -25,6 +25,10 @@
  *     reasons), its byte-identical preload mirror, and the
  *     wiring that applies it (preload adapter, explicit
  *     backgroundThrottling on every window).
+ *  9. 0.4.4: the application menu's hide/quit role items carry
+ *     pinned Minion labels, so the plumbing package identity the
+ *     runtime would otherwise generate them from reaches no
+ *     surface (teardown finding M-13).
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -401,7 +405,7 @@ ok('academy5: terminal page is a self-contained shell surface', () => {
 
 ok('academy5: terminal wiring across main, academy, preload', () => {
   const main = fs.readFileSync(path.join(ELE, 'main.cjs'), 'utf8');
-  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.3"/.test(main), 'build label is 0.4.3');
+  assert.ok(/ACADEMY_BUILD_LABEL = "0\.4\.4"/.test(main), 'build label is 0.4.4');
   assert.ok(/__academyTerminal/.test(main), 'activate handler can tell the terminal window apart');
   const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
   assert.ok(/label: 'Terminal'/.test(academy), 'View menu carries the Terminal item');
@@ -470,7 +474,7 @@ ok('floor audit: no post-floor APIs in the new app-layer code', () => {
   assert.ok(/preload: ACADEMY_PRELOAD/.test(main), 'main window carries the preload');
   assert.ok(/preload: ACADEMY_PRELOAD,/.test(main.replace(/\s+/g, ' ')) || /preload: ACADEMY_PRELOAD/.test(main), 'popup carries the preload');
   const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8'));
-  assert.strictEqual(pkg.version, '0.4.3');
+  assert.strictEqual(pkg.version, '0.4.4');
   assert.strictEqual(pkg.build.appId, 'com.detroitautomationacademy.minion');
 });
 
@@ -1177,6 +1181,28 @@ ok('0.4.2: auth continuity — the session store and the package identity keep t
       }
     });
   }
+});
+
+ok('0.4.4: menu role labels — Hide and Quit read Minion (teardown M-13)', () => {
+  // Owner screenshot 2026-11-14 (ground truth): in 0.4.3 the
+  // application menu read "Hide muse-desktop" and "Quit
+  // muse-desktop". The menu title and the About item were pinned
+  // to Minion in 0.4.2, but the hide/quit items are Electron
+  // roles: left unlabeled, the runtime generates their labels
+  // from app.getName() — the package identity, a plumbing value
+  // the session machinery keys on (0.4.2 auth-continuity group
+  // above; Distro files/32). Renaming the plumbing value is the
+  // 0.4.1 break, so 0.4.4 pins the labels in the template and
+  // leaves the identity untouched.
+  const academy = fs.readFileSync(path.join(ELE, 'academy.cjs'), 'utf8');
+  assert.ok(/\{ role: 'hide', label: 'Hide Minion' \}/.test(academy),
+    'Hide item carries the pinned Minion label');
+  assert.ok(/\{ role: 'quit', label: 'Quit Minion' \}/.test(academy),
+    'Quit item carries the pinned Minion label');
+  assert.ok(!/\{ role: 'hide' \}/.test(academy),
+    'no bare hide role item remains to be labeled from the plumbing identity');
+  assert.ok(!/\{ role: 'quit' \}/.test(academy),
+    'no bare quit role item remains to be labeled from the plumbing identity');
 });
 
 console.log('\nALL ' + passed + ' TEST GROUPS PASSED');
